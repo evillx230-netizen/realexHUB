@@ -104,10 +104,11 @@ local function saveSettings()
 end
 
 local busy = false
+local popToken = 0
 local renderChat, renderHistoryList, openHistoryModal, closeHistoryModal, openFileModal, closeFileModal
 local sendMessageRef, runCode, toast, explore, setOpen, clearChat, newHistory, loadHistory, deleteHistory
 local saveCur, addMessage, showTyping, typewrite, pushMsg, agentRun, geminiRaw, switchPage
-local popScan, updateModelLbl
+local popScan, updateModelLbl, setBlurOffAndDestroy
 
 local HistIndex = {}
 local Cur = { id = nil, title = "Новый чат", msgs = {} }
@@ -650,6 +651,9 @@ local function setAttachment(file)
     toBottom()
 end
 
+for _, c in ipairs(window:GetChildren()) do
+    if c:IsA("Frame") and c.Name == "InputBar" then c:Destroy() end
+end
 local inputBar = new("Frame", { Name = "InputBar", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 16, 1, -16), Size = UDim2.new(1, -32, 0, 56), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, BorderSizePixel = 0, ZIndex = 3 }, window)
 corner(inputBar, 28)
 local inputStroke = stroke(inputBar, 1.2, 0.7)
@@ -658,36 +662,53 @@ corner(attachBtn, 20)
 stroke(attachBtn, 1, 0.78)
 interactive(attachBtn, 0.9, 0.78)
 withIcon(attachBtn, "attach")
-local input = new("TextBox", { Position = UDim2.new(0, 58, 0, 18), Size = UDim2.new(1, -112, 0, 20), BackgroundTransparency = 1, Text = "", PlaceholderText = "Напиши сообщение...  (/explore, /scan, /clear)", PlaceholderColor3 = C.Sub, TextColor3 = C.Text, TextSize = 14, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, MultiLine = true, TextWrapped = true, ClearTextOnFocus = false, ZIndex = 4 }, inputBar)
 local sendBtn = new("TextButton", { Name = "Send", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(40, 40), BackgroundColor3 = C.White, Text = "↑", TextColor3 = C.Dark, TextSize = 20, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 4 }, inputBar)
 corner(sendBtn, 20)
 accentGradient(sendBtn, 45)
 interactive(sendBtn, 0, 0.12)
 withIcon(sendBtn, "send")
-
-local INPUT_MIN_H, INPUT_MAX_H, BAR_MIN, BAR_MAX = 20, 112, 56, 128
-local function resizeInput()
-    local w = math.max(input.AbsoluteSize.X, 140)
-    local ts = TextService:GetTextSize(input.Text, input.TextSize, input.Font, Vector2.new(w, math.huge))
-    local ih = math.clamp(math.max(ts.Y, INPUT_MIN_H), INPUT_MIN_H, INPUT_MAX_H)
-    local bh = math.clamp(ih + 16, BAR_MIN, BAR_MAX)
-    local off = math.floor((bh - ih) / 2)
-    input.Size = UDim2.new(1, -112, 0, ih)
-    input.Position = UDim2.new(0, 58, 0, off)
+local input = new("TextBox", {
+    Name = "InputBox",
+    AnchorPoint = Vector2.new(0, 0),
+    Position = UDim2.new(0, 58, 0, 18),
+    Size = UDim2.new(1, -112, 0, 20),
+    AutomaticSize = Enum.AutomaticSize.Y,
+    BackgroundTransparency = 1,
+    Text = "",
+    PlaceholderText = "Напиши сообщение...  (/explore, /scan, /clear)",
+    PlaceholderColor3 = C.Sub,
+    TextColor3 = C.Text,
+    TextSize = 14,
+    Font = FONT,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Top,
+    MultiLine = true,
+    TextWrapped = true,
+    TextTruncate = Enum.TextTruncate.None,
+    ClearTextOnFocus = false,
+    ZIndex = 4,
+}, inputBar)
+new("UISizeConstraint", { MinSize = Vector2.new(0, 20), MaxSize = Vector2.new(math.huge, 160) }, input)
+local function syncLayout()
+    local ih = input.AbsoluteSize.Y
+    if ih < 20 then ih = 20 end
+    local bh = math.clamp(ih + 36, 56, 196)
     inputBar.Size = UDim2.new(1, -32, 0, bh)
+    input.Position = UDim2.new(0, 58, 0, math.floor((bh - ih) / 2))
     content.Size = UDim2.new(1, -32, 1, -106 - (bh + 16))
-    pending.Position = UDim2.new(0, 16, 1, -(bh + 36))
+    pending.Position = UDim2.new(0, 16, 1, -(bh + 20))
 end
-
+input:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncLayout)
+input:GetPropertyChangedSignal("Text"):Connect(syncLayout)
+window:GetPropertyChangedSignal("Size"):Connect(syncLayout)
+task.defer(syncLayout)
 input.Focused:Connect(function() tween(inputStroke, 0.25, { Color = C.Accent1, Transparency = 0.1 }) end)
-input:GetPropertyChangedSignal("Text"):Connect(resizeInput)
-window:GetPropertyChangedSignal("Size"):Connect(resizeInput)
 input.FocusLost:Connect(function(enterPressed)
     tween(inputStroke, 0.25, { Color = C.White, Transparency = 0.7 })
     if enterPressed and not (UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)) then
         local t = input.Text
         input.Text = ""
-        resizeInput()
+        task.defer(syncLayout)
         if sendMessageRef then sendMessageRef(t) end
         task.defer(function() input:CaptureFocus() end)
     end
@@ -695,12 +716,9 @@ end)
 sendBtn.MouseButton1Click:Connect(function()
     local t = input.Text
     input.Text = ""
-    resizeInput()
+    task.defer(syncLayout)
     if sendMessageRef then sendMessageRef(t) end
 end)
-task.defer(resizeInput)
-end)
-sendBtn.MouseButton1Click:Connect(function() local t = input.Text; input.Text = ""; if sendMessageRef then sendMessageRef(t) end end)
 
 local function mkOverlay(name)
     local ov = new("Frame", { Name = name, Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false, Active = true, ZIndex = 20 }, window)
@@ -832,7 +850,6 @@ toast = function(text, dur)
     task.delay(dur or 2.5, function() if t and t.Parent then t:Destroy() end end)
 end
 
-local popToken = 0
 popScan = function(lines)
     popToken += 1
     local myToken = popToken
@@ -846,7 +863,7 @@ popScan = function(lines)
     local head = new("TextLabel", { Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, Text = "🛰 place preview", TextColor3 = C.Accent1, TextSize = 12, Font = FONT_BOLD, TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = 0, ZIndex = 31 }, panel)
     local bodyLines = {}
     for i, ln in ipairs(lines) do
-        local l = new("TextLabel", { Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, Text = ln, TextColor3 = C.Text, TextSize = 12, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, LayoutOrder = i, BackgroundTransparency2 = 1, ZIndex = 31 }, panel)
+        local l = new("TextLabel", { Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, Text = ln, TextColor3 = C.Text, TextSize = 12, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, LayoutOrder = i, ZIndex = 31 }, panel)
         l.TextTransparency = 1
         bodyLines[i] = l
     end
@@ -1260,7 +1277,6 @@ corner(fab, FAB_SIZE / 2)
 accentGradient(fab, 45)
 stroke(fab, 1.5, 0.4)
 local FabIcon = new("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = iconUrl("open"), ScaleType = Enum.ScaleType.Fit, ZIndex = 6, Active = false }, fab)
-
 do
     local vpp = Camera.ViewportSize
     local defX = vpp.X - FAB_SIZE - 24
@@ -1288,7 +1304,6 @@ setOpen = function(open)
         fab.Text = "◇"
     end
 end
-
 do
     local dragging, dragStart, startPos, moved = false, nil, nil, 0
     fab.InputBegan:Connect(function(i)
@@ -1353,17 +1368,16 @@ local function headerIcon(glyph, name, xOff, cb)
     b.MouseButton1Click:Connect(cb)
     return b
 end
+setBlurOffAndDestroy = function()
+    blur.Size = 0
+    gui:Destroy()
+    getgenv().RealexGeminiChat = nil
+end
 headerIcon("×", "close", -14, function() setBlurOffAndDestroy() end)
 headerIcon("—", "minimize", -56, function() setOpen(false) end)
 headerIcon("◷", "history", -98, function() openHistoryModal() end)
 headerIcon("↻", "new", -140, function() if busy then return end newHistory(false) end)
 headerIcon("🗑", "clear", -182, function() clearChat() end)
-
-function setBlurOffAndDestroy()
-    blur.Size = 0
-    gui:Destroy()
-    getgenv().RealexGeminiChat = nil
-end
 
 do
     local dragging, dragStart, startPos
