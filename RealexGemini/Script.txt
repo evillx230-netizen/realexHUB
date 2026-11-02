@@ -39,10 +39,6 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
-local GIT = { user = "evillx230-netizen", repo = "realexHUB", branch = "main", dir = "RealexGemini" }
-local ICON_BASE = "https://raw.githubusercontent.com/" .. GIT.user .. "/" .. GIT.repo .. "/" .. GIT.branch .. "/" .. GIT.dir .. "/dem/"
-local function iconUrl(name) return ICON_BASE .. name .. ".png" end
-
 local BASE = "RealexGemini"
 local CFG = BASE .. "/configs"
 local FILES = BASE .. "/files"
@@ -59,9 +55,6 @@ local MODELS = {
     "gemini-3.6-flash",
     "gemini-3.5-flash-lite",
     "gemini-3-flash",
-    "gemini-3.1-flash-lite",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
 }
 
 local Settings = {
@@ -412,7 +405,7 @@ geminiRaw = function(contents, callback, useTools)
     task.spawn(function()
         local ok, resp = pcall(function() return Safe.request({ Url = url, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = HttpService:JSONEncode(body) }) end)
         if not ok then callback(nil, "HTTP error: " .. tostring(resp)) return end
-        if resp.StatusCode == 429 then callback(nil, "Rate limit (429). Смени модель на flash-lite.") return end
+        if resp.StatusCode == 429 then callback(nil, "Rate limit (429). Смени модель.") return end
         if resp.StatusCode ~= 200 then
             local ok2, data = pcall(function() return HttpService:JSONDecode(resp.Body) end)
             callback(nil, "API " .. resp.StatusCode .. ": " .. (ok2 and data.error and data.error.message or resp.Body:sub(1, 200)))
@@ -432,8 +425,9 @@ local C = {
     Dark = Color3.fromRGB(24, 25, 28), Chip = Color3.fromRGB(78, 81, 90),
     Panel = Color3.fromRGB(36, 37, 42), White = Color3.new(1, 1, 1),
     Green = Color3.fromRGB(80, 220, 150), Red = Color3.fromRGB(255, 120, 120), Blue = Color3.fromRGB(101, 148, 255),
+    CodeBg = Color3.fromRGB(14, 15, 18), CodeHead = Color3.fromRGB(28, 30, 36), CodeTxt = Color3.fromRGB(200, 220, 200),
 }
-local FONT, FONT_BOLD = Enum.Font.Gotham, Enum.Font.GothamBold
+local FONT, FONT_BOLD, FONT_CODE = Enum.Font.Gotham, Enum.Font.GothamBold, Enum.Font.Code
 local function new(class, props, parent)
     local o = Instance.new(class)
     for k, v in pairs(props or {}) do
@@ -454,9 +448,6 @@ local function interactive(btn, normalT, hoverT)
     btn.MouseLeave:Connect(function() tween(btn, 0.2, { BackgroundTransparency = normalT }); tween(s, 0.2, { Scale = 1 }) end)
     btn.MouseButton1Down:Connect(function() tween(s, 0.1, { Scale = 0.94 }) end)
     btn.MouseButton1Up:Connect(function() tween(s, 0.15, { Scale = 1.05 }) end)
-end
-local function withIcon(host, name)
-    return new("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = iconUrl(name), ScaleType = Enum.ScaleType.Fit, ZIndex = (host.ZIndex or 0) + 1, Active = false }, host)
 end
 local function fileCard(parent, file, style, size, layoutOrder)
     local light, flat = style == "light", style == "flat"
@@ -483,37 +474,36 @@ local vp = Camera.ViewportSize
 local winW = math.clamp(vp.X * 0.62, WIN_MIN.X, WIN_MAX.X)
 local winH = math.clamp(vp.Y * 0.74, WIN_MIN.Y, WIN_MAX.Y)
 
-local window = new("Frame", { Name = "Window", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(winW, winH), BackgroundColor3 = C.White, BackgroundTransparency = 0.1, BorderSizePixel = 0, Active = true }, gui)
+local window = new("Frame", { Name = "Window", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(winW, winH), BackgroundColor3 = C.White, BackgroundTransparency = 0.1, BorderSizePixel = 0, Active = true, ZIndex = 0 }, gui)
 local windowScale = new("UIScale", { Scale = 0.9 }, window)
 corner(window, 26)
 new("UIGradient", { Color = ColorSequence.new(C.BgTop, C.Bg), Rotation = 125 }, window)
 local border = stroke(window, 1.6, 0)
 local borderGrad = new("UIGradient", { Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, C.Accent2), ColorSequenceKeypoint.new(0.5, C.White), ColorSequenceKeypoint.new(1, C.Accent2) }), Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(0.5, 0.8), NumberSequenceKeypoint.new(1, 0.2) }) }, border)
 RunService.RenderStepped:Connect(function() if borderGrad and borderGrad.Parent then borderGrad.Rotation = (os.clock() * 40) % 360 end end)
-local sheen = new("Frame", { Size = UDim2.new(1, 0, 0, 150), BackgroundColor3 = C.White, BorderSizePixel = 0, ZIndex = 0 }, window)
+local sheen = new("Frame", { Size = UDim2.new(1, 0, 0, 150), BackgroundColor3 = C.White, BorderSizePixel = 0, ZIndex = 1 }, window)
 corner(sheen, 26)
 new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new(0.9, 1) }, sheen)
 
-local header = new("Frame", { Name = "Header", Size = UDim2.new(1, 0, 0, 64), BackgroundTransparency = 1, ZIndex = 2 }, window)
-local avatar = new("Frame", { Position = UDim2.fromOffset(16, 12), Size = UDim2.fromOffset(40, 40), BackgroundColor3 = C.White, BorderSizePixel = 0, ZIndex = 3 }, header)
+local header = new("Frame", { Name = "Header", Size = UDim2.new(1, 0, 0, 64), BackgroundTransparency = 1, ZIndex = 3 }, window)
+local avatar = new("Frame", { Position = UDim2.fromOffset(16, 12), Size = UDim2.fromOffset(40, 40), BackgroundColor3 = C.White, BorderSizePixel = 0, ZIndex = 4 }, header)
 corner(avatar, 20)
 accentGradient(avatar, 45)
 stroke(avatar, 1, 0.5)
-new("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "✦", TextColor3 = C.Dark, TextSize = 18, Font = FONT_BOLD, ZIndex = 3 }, avatar)
-withIcon(avatar, "shine")
-new("TextLabel", { Position = UDim2.fromOffset(66, 11), Size = UDim2.new(1, -360, 0, 22), BackgroundTransparency = 1, Text = "Realex Gemini", TextColor3 = C.Text, TextSize = 17, Font = FONT_BOLD, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 3 }, header)
-local dot = new("Frame", { Position = UDim2.fromOffset(66, 39), Size = UDim2.fromOffset(8, 8), BackgroundColor3 = C.Green, BorderSizePixel = 0, ZIndex = 3 }, header)
+new("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "R", TextColor3 = C.Dark, TextSize = 24, Font = FONT_BOLD, ZIndex = 4 }, avatar)
+new("TextLabel", { Position = UDim2.fromOffset(66, 11), Size = UDim2.new(1, -360, 0, 22), BackgroundTransparency = 1, Text = "Realex Gemini", TextColor3 = C.Text, TextSize = 17, Font = FONT_BOLD, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 4 }, header)
+local dot = new("Frame", { Position = UDim2.fromOffset(66, 39), Size = UDim2.fromOffset(8, 8), BackgroundColor3 = C.Green, BorderSizePixel = 0, ZIndex = 4 }, header)
 corner(dot, 4)
-local statusLbl = new("TextLabel", { Position = UDim2.fromOffset(80, 33), Size = UDim2.new(1, -370, 0, 20), BackgroundTransparency = 1, Text = "scan: ...", TextColor3 = C.Sub, TextSize = 12, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 3 }, header)
-local modelChip = new("Frame", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -232, 0.5, 0), Size = UDim2.fromOffset(132, 24), BackgroundColor3 = C.White, BackgroundTransparency = 0.88, BorderSizePixel = 0, ZIndex = 3 }, header)
+local statusLbl = new("TextLabel", { Position = UDim2.fromOffset(80, 33), Size = UDim2.new(1, -370, 0, 20), BackgroundTransparency = 1, Text = "scan: ...", TextColor3 = C.Sub, TextSize = 12, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 4 }, header)
+local modelChip = new("Frame", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -330, 0.5, 0), Size = UDim2.fromOffset(132, 24), BackgroundColor3 = C.White, BackgroundTransparency = 0.88, BorderSizePixel = 0, ZIndex = 4 }, header)
 corner(modelChip, 12)
 stroke(modelChip, 1, 0.7)
-local modelChipLbl = new("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = Settings.model, TextColor3 = C.Text, TextSize = 11, Font = FONT_BOLD, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 4 }, modelChip)
+local modelChipLbl = new("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = Settings.model, TextColor3 = C.Text, TextSize = 11, Font = FONT_BOLD, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 5 }, modelChip)
 updateModelLbl = function() if modelChipLbl and modelChipLbl.Parent then modelChipLbl.Text = Settings.model end end
-local divider = new("Frame", { Position = UDim2.fromOffset(0, 64), Size = UDim2.new(1, 0, 0, 1), BackgroundColor3 = C.White, BorderSizePixel = 0, ZIndex = 2 }, window)
+local divider = new("Frame", { Position = UDim2.fromOffset(0, 64), Size = UDim2.new(1, 0, 0, 1), BackgroundColor3 = C.White, BorderSizePixel = 0, ZIndex = 3 }, window)
 new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.82), NumberSequenceKeypoint.new(1, 1) }) }, divider)
 
-local tabBar = new("Frame", { Name = "Tabs", Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 66), BackgroundTransparency = 1, ZIndex = 2 }, window)
+local tabBar = new("Frame", { Name = "Tabs", Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 66), BackgroundTransparency = 1, ZIndex = 3 }, window)
 new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), VerticalAlignment = Enum.VerticalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }, tabBar)
 padding(tabBar, 16, 0, 16, 0)
 local Pages = {}
@@ -527,22 +517,21 @@ switchPage = function(name)
     end
     currentPage = name
 end
-local function addTab(glyph, iconName, pageName)
-    local b = new("TextButton", { Size = UDim2.fromOffset(40, 30), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = glyph, TextColor3 = C.Text, TextSize = 16, Font = FONT_BOLD, AutoButtonColor = false, LayoutOrder = #tabBar:GetChildren(), ZIndex = 3 }, tabBar)
+local function addTab(title, pageName)
+    local b = new("TextButton", { Size = UDim2.fromOffset(64, 30), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = title, TextColor3 = C.Text, TextSize = 13, Font = FONT_BOLD, AutoButtonColor = false, LayoutOrder = #tabBar:GetChildren(), ZIndex = 4 }, tabBar)
     corner(b, 15)
     stroke(b, 1, 0.8)
     new("UIGradient", { Color = ColorSequence.new(C.Accent1, C.Accent2), Rotation = 45, Enabled = false }, b)
     interactive(b, 0.9, 0.78)
-    withIcon(b, iconName)
     b.MouseButton1Click:Connect(function() switchPage(pageName) end)
     TabBtns[pageName] = b
     return b
 end
 
 local content = new("Frame", { Name = "Content", Size = UDim2.new(1, -32, 1, -106 - 72), Position = UDim2.fromOffset(16, 106), BackgroundTransparency = 1, ZIndex = 2 }, window)
-local chatPage = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1 }, content)
+local chatPage = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 2 }, content)
 Pages.chat = chatPage
-local scroll = new("ScrollingFrame", { Name = "Messages", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = C.Accent1, ScrollBarImageTransparency = 0.4, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollingDirection = Enum.ScrollingDirection.Y }, chatPage)
+local scroll = new("ScrollingFrame", { Name = "Messages", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = C.Accent1, ScrollBarImageTransparency = 0.4, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollingDirection = Enum.ScrollingDirection.Y, ZIndex = 2 }, chatPage)
 padding(scroll, 2, 6, 2, 6)
 new("UIListLayout", { Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder }, scroll)
 local orderCounter = 10
@@ -554,9 +543,9 @@ local function toBottom()
 end
 local function makeRow(isUser, layoutOrder)
     if not layoutOrder then orderCounter += 1; layoutOrder = orderCounter end
-    local row = new("Frame", { Name = "Msg", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = layoutOrder }, scroll)
+    local row = new("Frame", { Name = "Msg", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = layoutOrder, ZIndex = 2 }, scroll)
     new("UIListLayout", { HorizontalAlignment = isUser and Enum.HorizontalAlignment.Right or Enum.HorizontalAlignment.Left, SortOrder = Enum.SortOrder.LayoutOrder }, row)
-    local bubble = new("Frame", { AutomaticSize = Enum.AutomaticSize.XY, Size = UDim2.fromOffset(0, 0), BackgroundColor3 = C.White, BackgroundTransparency = isUser and 0 or 0.9, BorderSizePixel = 0 }, row)
+    local bubble = new("Frame", { AutomaticSize = Enum.AutomaticSize.XY, Size = UDim2.fromOffset(0, 0), BackgroundColor3 = C.White, BackgroundTransparency = isUser and 0 or 0.9, BorderSizePixel = 0, ZIndex = 3 }, row)
     corner(bubble, 18)
     padding(bubble, 14, 10, 14, 10)
     if isUser then accentGradient(bubble, 35) else stroke(bubble, 1, 0.8) end
@@ -564,47 +553,88 @@ local function makeRow(isUser, layoutOrder)
     tween(s, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
     return row, bubble
 end
+local function splitCodeBlocks(text)
+    local blocks, rest, pos = {}, {}, 1
+    while true do
+        local startP, endP, lang, code = text:find("```(%w*)%s*(.-)```", pos, false)
+        if not startP then break end
+        if startP > pos then rest[#rest + 1] = text:sub(pos, startP - 1) end
+        blocks[#blocks + 1] = { lang = (lang == "" and "code" or lang), code = code }
+        pos = endP + 1
+    end
+    if pos <= #text then rest[#rest + 1] = text:sub(pos) end
+    return blocks, table.concat(rest, ""):gsub("^%s+", ""):gsub("%s+$", "")
+end
+local function makeCodeCard(parent, block, layoutOrder)
+    local card = new("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = C.CodeBg, BorderSizePixel = 0, LayoutOrder = layoutOrder, ZIndex = 4 }, parent)
+    corner(card, 10)
+    stroke(card, 1, 0.7, C.Chip)
+    new("UIListLayout", { Padding = UDim.new(0, 0), SortOrder = Enum.SortOrder.LayoutOrder }, card)
+    local head = new("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = C.CodeHead, BorderSizePixel = 0, LayoutOrder = 1, ZIndex = 5 }, card)
+    new("UICorner", { CornerRadius = UDim.new(0, 10) }, head)
+    new("Frame", { Size = UDim2.new(1, 0, 0, 10), Position = UDim2.new(0, 0, 1, -10), BackgroundColor3 = C.CodeHead, BorderSizePixel = 0, ZIndex = 5 }, head)
+    new("TextLabel", { Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -170, 1, 0), BackgroundTransparency = 1, Text = "``` " .. block.lang, TextColor3 = C.Sub, TextSize = 12, Font = FONT_CODE, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6 }, head)
+    local cpBtn = new("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(74, 22), BackgroundColor3 = C.Chip, Text = "Copy Code", TextColor3 = C.Text, TextSize = 11, Font = FONT_BOLD, BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 6 }, head)
+    corner(cpBtn, 6)
+    stroke(cpBtn, 1, 0.6, C.Accent2)
+    cpBtn.MouseButton1Click:Connect(function()
+        if Safe.setclipboard then
+            Safe.setclipboard(block.code)
+            cpBtn.Text = "Copied"
+            task.delay(1.2, function() if cpBtn.Parent then cpBtn.Text = "Copy Code" end end)
+        else
+            toast("setclipboard недоступен")
+        end
+    end)
+    local runB = new("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -88, 0.5, 0), Size = UDim2.fromOffset(46, 22), BackgroundColor3 = C.Blue, Text = "Run", TextColor3 = C.White, TextSize = 11, Font = FONT_BOLD, BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 6 }, head)
+    corner(runB, 6)
+    runB.MouseButton1Click:Connect(function()
+        switchPage("console")
+        runCode(block.code, "AI code")
+    end)
+    local body = new("TextBox", {
+        Size = UDim2.new(1, -16, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
+        Position = UDim2.new(0, 8, 0, 34), BackgroundTransparency = 1, Text = block.code,
+        TextColor3 = C.CodeTxt, TextSize = 12, Font = FONT_CODE,
+        TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
+        MultiLine = true, ReadOnly = true, ClearTextOnFocus = false, ZIndex = 5,
+    }, card)
+    new("UISizeConstraint", { MinSize = Vector2.new(0, 30), MaxSize = Vector2.new(math.huge, 600) }, body)
+    padding(body, 8, 6, 8, 6)
+    return card
+end
 addMessage = function(text, isUser, layoutOrder, file)
     local _, bubble = makeRow(isUser, layoutOrder)
     new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, bubble)
     local lo = 1
     if file then fileCard(bubble, file, isUser and "light" or nil, nil, lo); lo = lo + 1 end
-    local label
-    if text ~= "" then
-        label = new("TextLabel", { LayoutOrder = lo, AutomaticSize = Enum.AutomaticSize.XY, Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, Text = text, TextWrapped = true, TextColor3 = isUser and C.Dark or C.Text, TextSize = 14, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left }, bubble)
-        new("UISizeConstraint", { MaxSize = Vector2.new(360, math.huge) }, label)
+    local blocks, plain = splitCodeBlocks(text or "")
+    if plain ~= "" then
+        local label = new("TextLabel", { LayoutOrder = lo, AutomaticSize = Enum.AutomaticSize.XY, Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, Text = plain, TextWrapped = true, TextColor3 = isUser and C.Dark or C.Text, TextSize = 14, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 4 }, bubble)
+        new("UISizeConstraint", { MaxSize = Vector2.new(math.huge, math.huge) }, label)
+        lo = lo + 1
     end
-    local hasCode = (text or ""):find("```") ~= nil
-    if hasCode and not isUser then
-        local br = new("Frame", { Size = UDim2.new(1, 0, 0, 24), BackgroundTransparency = 1, LayoutOrder = lo + 1 }, bubble)
-        new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, br)
-        local function smallBtn(title, w, bg, fg, ord, cb, icn)
-            local b = new("TextButton", { Size = UDim2.fromOffset(w, 22), BackgroundColor3 = bg, BackgroundTransparency = 0.15, Text = title, TextColor3 = fg, Font = FONT_BOLD, TextSize = 11, BorderSizePixel = 0, LayoutOrder = ord, AutoButtonColor = false, ZIndex = 5 }, br)
-            corner(b, 7)
-            stroke(b, 1, 0.6, C.Accent2)
-            if icn then withIcon(b, icn) end
-            b.MouseButton1Click:Connect(cb)
-            return b
+    if #blocks > 0 and not isUser then
+        for _, blk in ipairs(blocks) do
+            makeCodeCard(bubble, blk, lo)
+            lo = lo + 1
         end
-        smallBtn("⧉ Copy", 64, C.Chip, C.Text, 1, function() if Safe.setclipboard then Safe.setclipboard(text); toast("Скопировано") end end, "copy")
-        smallBtn("▶ Run", 58, C.Blue, C.White, 2, function()
-            local blocks = {}
-            for b2 in text:gmatch("```lua%s*(.-)```") do blocks[#blocks + 1] = b2 end
-            if #blocks == 0 then for b2 in text:gmatch("```%s*(.-)```") do blocks[#blocks + 1] = b2 end end
-            if #blocks == 0 then toast("Код не найден") return end
-            switchPage("console")
-            runCode(table.concat(blocks, "\n"), "AI code")
-        end, "run")
+    elseif #blocks > 0 and isUser then
+        for _, blk in ipairs(blocks) do
+            local lbl = new("TextLabel", { LayoutOrder = lo, AutomaticSize = Enum.AutomaticSize.XY, Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, Text = "```" .. blk.lang .. "\n" .. blk.code .. "\n```", TextWrapped = true, TextColor3 = C.Dark, TextSize = 14, Font = FONT_CODE, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 4 }, bubble)
+            new("UISizeConstraint", { MaxSize = Vector2.new(math.huge, math.huge) }, lbl)
+            lo = lo + 1
+        end
     end
     toBottom()
-    return label
+    return bubble
 end
 showTyping = function()
     local row, bubble = makeRow(false)
     new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 5), VerticalAlignment = Enum.VerticalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }, bubble)
     local dots = {}
     for i = 1, 3 do
-        local d = new("Frame", { Size = UDim2.fromOffset(8, 8), BackgroundColor3 = C.Sub, BackgroundTransparency = 0.7, BorderSizePixel = 0, LayoutOrder = i }, bubble)
+        local d = new("Frame", { Size = UDim2.fromOffset(8, 8), BackgroundColor3 = C.Sub, BackgroundTransparency = 0.7, BorderSizePixel = 0, LayoutOrder = i, ZIndex = 4 }, bubble)
         corner(d, 4)
         dots[i] = d
     end
@@ -624,10 +654,10 @@ showTyping = function()
     return function() alive = false; if row and row.Parent then row:Destroy() end end
 end
 
-local chips = new("Frame", { Name = "Chips", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 999999, Visible = true }, scroll)
+local chips = new("Frame", { Name = "Chips", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 999999, Visible = true, ZIndex = 3 }, scroll)
 new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Wraps = true, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, chips)
-for i, info in ipairs({ { "/explore", "explore" }, { "/scan", "scan" }, { "Найди hollows и их ремоты урона", "reader" }, { "Объясни структуру RemoteEvents", "chat" } }) do
-    local chip = new("TextButton", { AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 32), LayoutOrder = i, BackgroundColor3 = C.White, BackgroundTransparency = 0.92, Text = info[1], TextColor3 = C.Text, TextSize = 12, Font = FONT, AutoButtonColor = false }, chips)
+for i, info in ipairs({ { "/explore", "Explore" }, { "/scan", "Rescan" }, { "Найди hollows и их ремоты урона", "Hollows" }, { "Объясни структуру RemoteEvents", "Remotes" } }) do
+    local chip = new("TextButton", { AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 32), LayoutOrder = i, BackgroundColor3 = C.White, BackgroundTransparency = 0.92, Text = info[2], TextColor3 = C.Text, TextSize = 12, Font = FONT, AutoButtonColor = false, ZIndex = 4 }, chips)
     corner(chip, 16)
     stroke(chip, 1, 0.75)
     padding(chip, 14, 0, 14, 0)
@@ -636,13 +666,13 @@ for i, info in ipairs({ { "/explore", "explore" }, { "/scan", "scan" }, { "На�
 end
 
 local attached = nil
-local pending = new("Frame", { Name = "Pending", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 16, 1, -92), Size = UDim2.new(1, -32, 0, 48), BackgroundTransparency = 1, Visible = false, ZIndex = 3 }, window)
+local pending = new("Frame", { Name = "Pending", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 16, 1, -92), Size = UDim2.new(1, -32, 0, 48), BackgroundTransparency = 1, Visible = false, ZIndex = 5 }, window)
 local function clearAttachment() attached = nil; pending.Visible = false end
 local function setAttachment(file)
     attached = file
     for _, c in ipairs(pending:GetChildren()) do c:Destroy() end
     fileCard(pending, file, nil, UDim2.new(1, -44, 1, 0))
-    local rm = new("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.fromOffset(34, 34), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "×", TextColor3 = C.Text, TextSize = 18, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 4 }, pending)
+    local rm = new("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.fromOffset(34, 34), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "x", TextColor3 = C.Text, TextSize = 16, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 6 }, pending)
     corner(rm, 17)
     stroke(rm, 1, 0.8)
     interactive(rm, 0.9, 0.78)
@@ -654,19 +684,17 @@ end
 for _, c in ipairs(window:GetChildren()) do
     if c:IsA("Frame") and c.Name == "InputBar" then c:Destroy() end
 end
-local inputBar = new("Frame", { Name = "InputBar", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 16, 1, -16), Size = UDim2.new(1, -32, 0, 56), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, BorderSizePixel = 0, ZIndex = 3 }, window)
+local inputBar = new("Frame", { Name = "InputBar", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 16, 1, -16), Size = UDim2.new(1, -32, 0, 56), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, BorderSizePixel = 0, ZIndex = 5 }, window)
 corner(inputBar, 28)
 local inputStroke = stroke(inputBar, 1.2, 0.7)
-local attachBtn = new("TextButton", { Name = "Attach", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 8, 0.5, 0), Size = UDim2.fromOffset(40, 40), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "+", TextColor3 = C.Text, TextSize = 22, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 4 }, inputBar)
+local attachBtn = new("TextButton", { Name = "Attach", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 8, 0.5, 0), Size = UDim2.fromOffset(40, 40), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "+", TextColor3 = C.Text, TextSize = 22, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 6 }, inputBar)
 corner(attachBtn, 20)
 stroke(attachBtn, 1, 0.78)
 interactive(attachBtn, 0.9, 0.78)
-withIcon(attachBtn, "attach")
-local sendBtn = new("TextButton", { Name = "Send", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(40, 40), BackgroundColor3 = C.White, Text = "↑", TextColor3 = C.Dark, TextSize = 20, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 4 }, inputBar)
+local sendBtn = new("TextButton", { Name = "Send", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(40, 40), BackgroundColor3 = C.White, Text = "Send", TextColor3 = C.Dark, TextSize = 12, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 6 }, inputBar)
 corner(sendBtn, 20)
 accentGradient(sendBtn, 45)
 interactive(sendBtn, 0, 0.12)
-withIcon(sendBtn, "send")
 local input = new("TextBox", {
     Name = "InputBox",
     AnchorPoint = Vector2.new(0, 0),
@@ -686,7 +714,7 @@ local input = new("TextBox", {
     TextWrapped = true,
     TextTruncate = Enum.TextTruncate.None,
     ClearTextOnFocus = false,
-    ZIndex = 4,
+    ZIndex = 6,
 }, inputBar)
 new("UISizeConstraint", { MinSize = Vector2.new(0, 20), MaxSize = Vector2.new(math.huge, 160) }, input)
 local function syncLayout()
@@ -721,9 +749,9 @@ sendBtn.MouseButton1Click:Connect(function()
 end)
 
 local function mkOverlay(name)
-    local ov = new("Frame", { Name = name, Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false, Active = true, ZIndex = 20 }, window)
+    local ov = new("Frame", { Name = name, Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false, Active = true, ZIndex = 40 }, window)
     corner(ov, 26)
-    local card = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, -40, 0.82, 0), BackgroundColor3 = C.Panel, BackgroundTransparency = 0.03, BorderSizePixel = 0 }, ov)
+    local card = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, -40, 0.82, 0), BackgroundColor3 = C.Panel, BackgroundTransparency = 0.03, BorderSizePixel = 0, ZIndex = 41 }, ov)
     new("UISizeConstraint", { MaxSize = Vector2.new(460, 440), MinSize = Vector2.new(0, 300) }, card)
     corner(card, 20)
     stroke(card, 1.2, 0.7)
@@ -732,21 +760,21 @@ local function mkOverlay(name)
 end
 
 local fileOv, fileCardRoot, fileScale = mkOverlay("FileModal")
-new("TextLabel", { Position = UDim2.fromOffset(20, 14), Size = UDim2.new(1, -80, 0, 24), BackgroundTransparency = 1, Text = "Прикрепить файл", TextColor3 = C.Text, TextSize = 17, Font = FONT_BOLD, TextXAlignment = Enum.TextXAlignment.Left }, fileCardRoot)
-new("TextLabel", { Position = UDim2.fromOffset(20, 38), Size = UDim2.new(1, -40, 0, 18), BackgroundTransparency = 1, Text = "Файлы из папки " .. FILES, TextColor3 = C.Sub, TextSize = 12, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left }, fileCardRoot)
-local fileClose = new("TextButton", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 12), Size = UDim2.fromOffset(32, 32), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "×", TextColor3 = C.Text, TextSize = 18, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 21 }, fileCardRoot)
+new("TextLabel", { Position = UDim2.fromOffset(20, 14), Size = UDim2.new(1, -80, 0, 24), BackgroundTransparency = 1, Text = "Прикрепить файл", TextColor3 = C.Text, TextSize = 17, Font = FONT_BOLD, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 42 }, fileCardRoot)
+new("TextLabel", { Position = UDim2.fromOffset(20, 38), Size = UDim2.new(1, -40, 0, 18), BackgroundTransparency = 1, Text = "Файлы из папки " .. FILES, TextColor3 = C.Sub, TextSize = 12, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 42 }, fileCardRoot)
+local fileClose = new("TextButton", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 12), Size = UDim2.fromOffset(32, 32), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "x", TextColor3 = C.Text, TextSize = 16, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 42 }, fileCardRoot)
 corner(fileClose, 16)
 stroke(fileClose, 1, 0.8)
 interactive(fileClose, 0.9, 0.78)
-local fileList = new("ScrollingFrame", { Position = UDim2.fromOffset(16, 66), Size = UDim2.new(1, -32, 1, -124), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = C.Accent1, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 21 }, fileCardRoot)
+local fileList = new("ScrollingFrame", { Position = UDim2.fromOffset(16, 66), Size = UDim2.new(1, -32, 1, -124), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = C.Accent1, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 42 }, fileCardRoot)
 padding(fileList, 2, 2, 2, 2)
 new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, fileList)
-local fileBtnRow = new("Frame", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 16, 1, -16), Size = UDim2.new(1, -32, 0, 40), BackgroundTransparency = 1, ZIndex = 21 }, fileCardRoot)
-local fileCancel = new("TextButton", { Size = UDim2.new(0.5, -6, 1, 0), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "Отмена", TextColor3 = C.Text, TextSize = 14, Font = FONT_BOLD, AutoButtonColor = false }, fileBtnRow)
+local fileBtnRow = new("Frame", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 16, 1, -16), Size = UDim2.new(1, -32, 0, 40), BackgroundTransparency = 1, ZIndex = 42 }, fileCardRoot)
+local fileCancel = new("TextButton", { Size = UDim2.new(0.5, -6, 1, 0), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "Отмена", TextColor3 = C.Text, TextSize = 14, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 43 }, fileBtnRow)
 corner(fileCancel, 20)
 stroke(fileCancel, 1, 0.75)
 interactive(fileCancel, 0.9, 0.8)
-local fileOk = new("TextButton", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(0.5, -6, 1, 0), BackgroundColor3 = C.White, Text = "Прикрепить", TextColor3 = C.Dark, TextSize = 14, Font = FONT_BOLD, AutoButtonColor = false }, fileBtnRow)
+local fileOk = new("TextButton", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(0.5, -6, 1, 0), BackgroundColor3 = C.White, Text = "Прикрепить", TextColor3 = C.Dark, TextSize = 14, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 43 }, fileBtnRow)
 corner(fileOk, 20)
 accentGradient(fileOk, 45)
 interactive(fileOk, 0, 0.12)
@@ -754,28 +782,30 @@ local pickedFile = nil
 local function buildFileList()
     for _, c in ipairs(fileList:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
     pickedFile = nil
-    if not Safe.listfiles then new("TextLabel", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, Text = "listfiles недоступен в этом executor'е", TextColor3 = C.Sub, TextSize = 12, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left }, fileList) return end
+    if not Safe.listfiles then new("TextLabel", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, Text = "listfiles недоступен в этом executor'е", TextColor3 = C.Sub, TextSize = 12, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 43 }, fileList) return end
     local ok, files = pcall(function() return Safe.listfiles(FILES) end)
-    if not ok or type(files) ~= "table" then new("TextLabel", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, Text = "Папка пуста или не читается", TextColor3 = C.Sub, TextSize = 12, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left }, fileList) return end
+    if not ok or type(files) ~= "table" then new("TextLabel", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, Text = "Папка пуста или не читается", TextColor3 = C.Sub, TextSize = 12, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 43 }, fileList) return end
     local n = 0
     for _, f in ipairs(files) do
         if n >= 60 then break end
         local name = f:match("([^/\\]+)$") or f
-        if Safe.isfile and Safe.isfile(f) then
+        local full = f
+        if not f:find("/", 1, true) and not f:find("\\", 1, true) then full = FILES .. "/" .. f end
+        if Safe.isfile and Safe.isfile(full) then
             n = n + 1
             local ext = (name:match("%.([%w]+)$") or "BIN"):upper()
             local sz = "?"
-            local rok, rd = pcall(function() return Safe.readfile(f) end)
+            local rok, rd = pcall(function() return Safe.readfile(full) end)
             if rok and rd then sz = tostring(#rd) .. " Б" end
-            local row = new("TextButton", { Size = UDim2.new(1, 0, 0, 52), LayoutOrder = n, BackgroundColor3 = C.White, BackgroundTransparency = 0.93, Text = "", AutoButtonColor = false, ZIndex = 22 }, fileList)
+            local row = new("TextButton", { Size = UDim2.new(1, 0, 0, 52), LayoutOrder = n, BackgroundColor3 = C.White, BackgroundTransparency = 0.93, Text = "", AutoButtonColor = false, ZIndex = 43 }, fileList)
             corner(row, 12)
             stroke(row, 1, 0.8)
             fileCard(row, { name = name, size = sz, ext = ext }, "flat", UDim2.new(1, -44, 1, 0))
-            local check = new("Frame", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0), Size = UDim2.fromOffset(18, 18), BackgroundColor3 = C.Accent1, BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 23 }, row)
+            local check = new("Frame", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0), Size = UDim2.fromOffset(18, 18), BackgroundColor3 = C.Accent1, BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 44 }, row)
             corner(check, 9)
             stroke(check, 1, 0.5)
             row.MouseButton1Click:Connect(function()
-                pickedFile = { path = f, name = name, size = sz, ext = ext }
+                pickedFile = { path = full, name = name, size = sz, ext = ext }
                 for _, c2 in ipairs(fileList:GetChildren()) do
                     if c2:IsA("TextButton") then
                         local ck = c2:FindFirstChildWhichIsA("Frame")
@@ -803,17 +833,16 @@ fileClose.MouseButton1Click:Connect(closeFileModal)
 attachBtn.MouseButton1Click:Connect(openFileModal)
 
 local histOv, histCard, histScale = mkOverlay("HistoryModal")
-new("TextLabel", { Position = UDim2.fromOffset(20, 14), Size = UDim2.new(1, -90, 0, 24), BackgroundTransparency = 1, Text = "Истории чатов", TextColor3 = C.Text, TextSize = 17, Font = FONT_BOLD, TextXAlignment = Enum.TextXAlignment.Left }, histCard)
-local histNewBtn = new("TextButton", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -54, 0, 12), Size = UDim2.fromOffset(34, 34), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "+", TextColor3 = C.Text, TextSize = 20, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 21 }, histCard)
+new("TextLabel", { Position = UDim2.fromOffset(20, 14), Size = UDim2.new(1, -90, 0, 24), BackgroundTransparency = 1, Text = "Истории чатов", TextColor3 = C.Text, TextSize = 17, Font = FONT_BOLD, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 42 }, histCard)
+local histNewBtn = new("TextButton", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -54, 0, 12), Size = UDim2.fromOffset(34, 34), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "+", TextColor3 = C.Text, TextSize = 20, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 42 }, histCard)
 corner(histNewBtn, 17)
 stroke(histNewBtn, 1, 0.8)
 interactive(histNewBtn, 0.9, 0.78)
-withIcon(histNewBtn, "new")
-local histClose = new("TextButton", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 12), Size = UDim2.fromOffset(32, 32), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "×", TextColor3 = C.Text, TextSize = 18, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 21 }, histCard)
+local histClose = new("TextButton", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 12), Size = UDim2.fromOffset(32, 32), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "x", TextColor3 = C.Text, TextSize = 16, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 42 }, histCard)
 corner(histClose, 16)
 stroke(histClose, 1, 0.8)
 interactive(histClose, 0.9, 0.78)
-local histList = new("ScrollingFrame", { Position = UDim2.fromOffset(16, 58), Size = UDim2.new(1, -32, 1, -74), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = C.Accent1, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 21 }, histCard)
+local histList = new("ScrollingFrame", { Position = UDim2.fromOffset(16, 58), Size = UDim2.new(1, -32, 1, -74), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = C.Accent1, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 42 }, histCard)
 padding(histList, 2, 2, 2, 2)
 new("UIListLayout", { Padding = UDim2.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, histList)
 renderHistoryList = function()
@@ -821,16 +850,15 @@ renderHistoryList = function()
     table.sort(HistIndex, function(a, b) return (a.updated or 0) > (b.updated or 0) end)
     for i, e in ipairs(HistIndex) do
         local active = (e.id == Cur.id)
-        local row = new("TextButton", { Size = UDim2.new(1, 0, 0, 56), LayoutOrder = i, BackgroundColor3 = C.White, BackgroundTransparency = active and 0.84 or 0.93, Text = "", AutoButtonColor = false, ZIndex = 22 }, histList)
+        local row = new("TextButton", { Size = UDim2.new(1, 0, 0, 56), LayoutOrder = i, BackgroundColor3 = C.White, BackgroundTransparency = active and 0.84 or 0.93, Text = "", AutoButtonColor = false, ZIndex = 43 }, histList)
         corner(row, 14)
         stroke(row, 1, active and 0.1 or 0.8, active and C.Accent1 or C.White)
-        new("TextLabel", { Position = UDim2.fromOffset(14, 9), Size = UDim2.new(1, -90, 0, 20), BackgroundTransparency = 1, Text = e.title or "Чат", TextColor3 = C.Text, TextSize = 14, Font = FONT_BOLD, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 23 }, row)
+        new("TextLabel", { Position = UDim2.fromOffset(14, 9), Size = UDim2.new(1, -90, 0, 20), BackgroundTransparency = 1, Text = e.title or "Чат", TextColor3 = C.Text, TextSize = 14, Font = FONT_BOLD, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 44 }, row)
         local when = e.updated and os.date("%d.%m %H:%M", e.updated) or "—"
-        new("TextLabel", { Position = UDim2.fromOffset(14, 31), Size = UDim2.new(1, -90, 0, 16), BackgroundTransparency = 1, Text = (e.count or 0) .. " сообщ.  ·  " .. when, TextColor3 = C.Sub, TextSize = 11, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23 }, row)
-        local del = new("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(30, 30), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "🗑", TextColor3 = C.Red, TextSize = 14, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 24 }, row)
+        new("TextLabel", { Position = UDim2.fromOffset(14, 31), Size = UDim2.new(1, -90, 0, 16), BackgroundTransparency = 1, Text = (e.count or 0) .. " сообщ.  ·  " .. when, TextColor3 = C.Sub, TextSize = 11, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 44 }, row)
+        local del = new("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(34, 30), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "Del", TextColor3 = C.Red, TextSize = 11, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 45 }, row)
         corner(del, 15)
         stroke(del, 1, 0.8)
-        withIcon(del, "trash")
         del.MouseButton1Click:Connect(function() deleteHistory(e.id) end)
         row.MouseButton1Click:Connect(function() loadHistory(e.id); closeHistoryModal() end)
     end
@@ -860,7 +888,7 @@ popScan = function(lines)
     accentGradient(ps, 45)
     padding(panel, 14, 10, 14, 12)
     new("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }, panel)
-    local head = new("TextLabel", { Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, Text = "🛰 place preview", TextColor3 = C.Accent1, TextSize = 12, Font = FONT_BOLD, TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = 0, ZIndex = 31 }, panel)
+    local head = new("TextLabel", { Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, Text = "PLACE PREVIEW", TextColor3 = C.Accent1, TextSize = 12, Font = FONT_BOLD, TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = 0, ZIndex = 31 }, panel)
     local bodyLines = {}
     for i, ln in ipairs(lines) do
         local l = new("TextLabel", { Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, Text = ln, TextColor3 = C.Text, TextSize = 12, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, LayoutOrder = i, ZIndex = 31 }, panel)
@@ -936,12 +964,12 @@ agentRun = function(contents, onLog, finalCb)
             local respParts = {}
             for _, call in ipairs(calls) do
                 local argsStr = pcall(function() return HttpService:JSONEncode(call.args or {}) end) and HttpService:JSONEncode(call.args or {}) or ""
-                onLog("🔧 " .. tostring(call.name) .. "(" .. argsStr:sub(1, 80) .. ")")
+                onLog("[tool] " .. tostring(call.name) .. "(" .. argsStr:sub(1, 80) .. ")")
                 local tool = TOOLS[call.name]
                 local payload
                 if tool then local ok, res = pcall(tool.fn, call.args or {}); payload = ok and res or { error = tostring(res) } else payload = { error = "unknown tool: " .. tostring(call.name) } end
                 if type(payload) ~= "table" then payload = { result = tostring(payload) } end
-                onLog((payload.error and "   ⚠ " .. tostring(payload.error):sub(1, 60) or "   ✔ ok"))
+                onLog((payload.error and "   [warn] " .. tostring(payload.error):sub(1, 60) or "   [ok]"))
                 respParts[#respParts + 1] = { functionResponse = { name = call.name, response = payload } }
             end
             cur[#cur + 1] = { role = "user", parts = respParts }
@@ -976,8 +1004,8 @@ explore = function(goal, auto)
     if busy then if not auto then toast("ИИ уже исследует") end return end
     busy = true
     chips.Visible = false
-    popScan({ "🔍 explore запущен", goal:sub(1, 46) .. (goal:len() > 46 and "…" or "") })
-    addMessage((auto and "[🤖 AUTO] " or "[🔍 EXPLORE] ") .. goal, true)
+    popScan({ "EXPLORE запущен", goal:sub(1, 46) .. (goal:len() > 46 and "..." or "") })
+    addMessage((auto and "[AUTO] " or "[EXPLORE] ") .. goal, true)
     pushMsg("user", "[explore] " .. goal:sub(1, 200))
     local contents = {}
     if Settings.attachContext and Scan.digest ~= "" then
@@ -985,20 +1013,22 @@ explore = function(goal, auto)
         contents[#contents + 1] = { role = "model", parts = { { text = "Контекст принят. Исследую инструментами." } } }
     end
     contents[#contents + 1] = { role = "user", parts = { { text = goal } } }
-    local logText = "🛰 Агент изучает игру..."
-    local logLabel = addMessage(logText, false)
+    local logText = "Агент изучает игру..."
+    local logBubble = addMessage(logText, false)
     local function onLog(line)
         logText = logText .. "\n" .. line
-        if logLabel and logLabel.Parent then logLabel.Text = logText:sub(-1200) end
+        if logBubble and logBubble.Parent then
+            local tl = logBubble:FindFirstChildWhichIsA("TextLabel")
+            if tl then tl.Text = logText:sub(-1200) end
+        end
         toBottom()
     end
     agentRun(contents, onLog, function(answer, err)
         busy = false
-        if err then addMessage("⚠ " .. err, false); return end
+        if err then addMessage("! " .. err, false); return end
         if (answer or ""):gsub("%s", "") == "" then answer = "Резюме не получилось — уточни цель через /explore <задача>." end
-        if logLabel and logLabel.Parent then logLabel:Destroy() end
-        local lbl = addMessage(answer, false)
-        typewrite(lbl, answer)
+        if logBubble and logBubble.Parent then logBubble:Destroy() end
+        addMessage(answer, false)
         pushMsg("model", answer)
     end)
 end
@@ -1031,22 +1061,24 @@ sendMessageRef = function(rawText)
     if Settings.memory then for i = math.max(1, #Cur.msgs - 11), #Cur.msgs do contents[#contents + 1] = Cur.msgs[i] end end
     contents[#contents + 1] = { role = "user", parts = parts }
     if Settings.chatTools then
-        local logText = "🔧 смотрю игру..."
-        local logLabel = addMessage(logText, false)
+        local logText = "смотрю игру..."
+        local logBubble = addMessage(logText, false)
         local started = false
         local function onLog(line)
-            if not started then logText = "🔧 ИИ изучает:"; started = true end
+            if not started then logText = "ИИ изучает:"; started = true end
             logText = logText .. "\n" .. line
-            if logLabel and logLabel.Parent then logLabel.Text = logText:sub(-1200) end
+            if logBubble and logBubble.Parent then
+                local tl = logBubble:FindFirstChildWhichIsA("TextLabel")
+                if tl then tl.Text = logText:sub(-1200) end
+            end
             toBottom()
         end
         agentRun(contents, onLog, function(answer, err)
             busy = false
-            if err then if logLabel and logLabel.Parent then logLabel:Destroy() end; addMessage("⚠ " .. err, false); return end
-            if not started and logLabel and logLabel.Parent then logLabel:Destroy() end
+            if err then if logBubble and logBubble.Parent then logBubble:Destroy() end; addMessage("! " .. err, false); return end
+            if not started and logBubble and logBubble.Parent then logBubble:Destroy() end
             if (answer or ""):gsub("%s", "") == "" then answer = "Пустой ответ — выключи AI tools in chat или смени модель." end
-            local lbl = addMessage(answer, false)
-            typewrite(lbl, answer)
+            addMessage(answer, false)
             pushMsg("model", answer)
         end)
     else
@@ -1054,13 +1086,12 @@ sendMessageRef = function(rawText)
         geminiRaw(contents, function(content, err)
             busy = false
             stopTyping()
-            if err then addMessage("⚠ " .. err, false); return end
+            if err then addMessage("! " .. err, false); return end
             local ptext = {}
             if type(content) == "table" and content.parts then for _, p in ipairs(content.parts) do if p.text then ptext[#ptext + 1] = p.text end end end
             local final = table.concat(ptext, "\n")
             if final:gsub("%s", "") == "" then final = "Пустой ответ — попробуй ещё раз или смени модель." end
-            local lbl = addMessage(final, false)
-            typewrite(lbl, final)
+            addMessage(final, false)
             pushMsg("model", final)
         end, false)
     end
@@ -1086,27 +1117,27 @@ clearChat = function()
     toast("Чат очищен")
 end
 
-addTab("🏠", "home", "chat")
-addTab("🔍", "reader", "reader")
-addTab("⌨", "console", "console")
-addTab("⚙", "settings", "settings")
+addTab("Chat", "chat")
+addTab("View", "reader")
+addTab("Exec", "console")
+addTab("Set", "settings")
 switchPage("chat")
 
-local readerPage = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false }, content)
+local readerPage = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, ZIndex = 2 }, content)
 Pages.reader = readerPage
 local categories = { { key = "remotes", label = "Remotes" }, { key = "workspaceTop", label = "Workspace" }, { key = "scripts", label = "Scripts" }, { key = "tags", label = "Tags" }, { key = "gui", label = "PlayerGui" }, { key = "player", label = "Player" } }
 local currentCat = "remotes"
-local rCatBar = new("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1 }, readerPage)
+local rCatBar = new("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, ZIndex = 3 }, readerPage)
 new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, rCatBar)
 local rCatBtns = {}
-local rList = new("ScrollingFrame", { Size = UDim2.new(0.44, -6, 1, -38), Position = UDim2.fromOffset(0, 34), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = C.Accent1, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y }, readerPage)
+local rList = new("ScrollingFrame", { Size = UDim2.new(0.44, -6, 1, -38), Position = UDim2.fromOffset(0, 34), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = C.Accent1, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 3 }, readerPage)
 corner(rList, 14)
 new("UIListLayout", { Padding = UDim.new(0, 3) }, rList)
 padding(rList, 6, 6, 6, 6)
-local rSearch = new("TextBox", { Size = UDim2.new(0.56, 0, 0, 28), Position = UDim2.new(0.44, 6, 0, 34), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, PlaceholderText = "поиск...", Text = "", TextColor3 = C.Text, PlaceholderColor3 = C.Sub, Font = FONT, TextSize = 12, BorderSizePixel = 0, ClearTextOnFocus = false }, readerPage)
+local rSearch = new("TextBox", { Size = UDim2.new(0.56, 0, 0, 28), Position = UDim2.new(0.44, 6, 0, 34), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, PlaceholderText = "поиск...", Text = "", TextColor3 = C.Text, PlaceholderColor3 = C.Sub, Font = FONT, TextSize = 12, BorderSizePixel = 0, ClearTextOnFocus = false, ZIndex = 3 }, readerPage)
 corner(rSearch, 14)
 padding(rSearch, 0, 0, 12, 12)
-local rDetail = new("TextBox", { Size = UDim2.new(0.56, 0, 1, -68), Position = UDim2.new(0.44, 6, 0, 68), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "Выбери элемент слева...", TextColor3 = C.Sub, Font = Enum.Font.Code, TextSize = 11, BorderSizePixel = 0, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, MultiLine = true, ClearTextOnFocus = false }, readerPage)
+local rDetail = new("TextBox", { Size = UDim2.new(0.56, 0, 1, -68), Position = UDim2.new(0.44, 6, 0, 68), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "Выбери элемент слева...", TextColor3 = C.Sub, Font = FONT_CODE, TextSize = 11, BorderSizePixel = 0, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, MultiLine = true, ClearTextOnFocus = false, ZIndex = 3 }, readerPage)
 corner(rDetail, 14)
 padding(rDetail, 8, 8, 8, 8)
 local function renderReaderList(filter)
@@ -1115,7 +1146,7 @@ local function renderReaderList(filter)
     filter = (filter or ""):lower()
     for _, item in ipairs(data) do
         if filter == "" or item.path:lower():find(filter, 1, true) then
-            local b = new("TextButton", { Size = UDim2.new(1, -4, 0, 22), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, Text = "  " .. item.path, TextColor3 = C.Sub, Font = FONT, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, BorderSizePixel = 0, TextTruncate = Enum.TextTruncate.AtEnd, AutoButtonColor = false }, rList)
+            local b = new("TextButton", { Size = UDim2.new(1, -4, 0, 22), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, Text = "  " .. item.path, TextColor3 = C.Sub, Font = FONT, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, BorderSizePixel = 0, TextTruncate = Enum.TextTruncate.AtEnd, AutoButtonColor = false, ZIndex = 4 }, rList)
             corner(b, 6)
             b.MouseButton1Click:Connect(function()
                 local out = { "PATH:  " .. item.path, "CLASS: " .. item.class }
@@ -1141,7 +1172,7 @@ local function renderReaderList(filter)
     end
 end
 for _, c in ipairs(categories) do
-    local b = new("TextButton", { Size = UDim2.fromOffset(86, 26), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = c.label, TextColor3 = C.Sub, Font = FONT, TextSize = 12, BorderSizePixel = 0, AutoButtonColor = false, LayoutOrder = #rCatBar:GetChildren() }, rCatBar)
+    local b = new("TextButton", { Size = UDim2.fromOffset(86, 26), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = c.label, TextColor3 = C.Sub, Font = FONT, TextSize = 12, BorderSizePixel = 0, AutoButtonColor = false, LayoutOrder = #rCatBar:GetChildren(), ZIndex = 4 }, rCatBar)
     corner(b, 13)
     stroke(b, 1, 0.8)
     rCatBtns[c.key] = b
@@ -1153,32 +1184,31 @@ for _, c in ipairs(categories) do
 end
 rSearch:GetPropertyChangedSignal("Text"):Connect(function() renderReaderList(rSearch.Text) end)
 
-local consolePage = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false }, content)
+local consolePage = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, ZIndex = 2 }, content)
 Pages.console = consolePage
-local codeBox = new("TextBox", { Size = UDim2.new(1, 0, 0.5, -16), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "", PlaceholderText = "-- твой код сюда", TextColor3 = C.Text, PlaceholderColor3 = C.Sub, Font = Enum.Font.Code, TextSize = 12, BorderSizePixel = 0, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, MultiLine = true, ClearTextOnFocus = false }, consolePage)
+local codeBox = new("TextBox", { Size = UDim2.new(1, 0, 0.5, -16), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "", PlaceholderText = "-- твой код сюда", TextColor3 = C.Text, PlaceholderColor3 = C.Sub, Font = FONT_CODE, TextSize = 12, BorderSizePixel = 0, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, MultiLine = true, ClearTextOnFocus = false, ZIndex = 3 }, consolePage)
 corner(codeBox, 14)
 padding(codeBox, 8, 8, 8, 8)
-local runBtn = new("TextButton", { Size = UDim2.fromOffset(90, 30), Position = UDim2.new(0, 0, 0.5, -8), BackgroundColor3 = C.White, Text = "▶ Run", TextColor3 = C.Dark, Font = FONT_BOLD, TextSize = 13, BorderSizePixel = 0, AutoButtonColor = false }, consolePage)
+local runBtn = new("TextButton", { Size = UDim2.fromOffset(90, 30), Position = UDim2.new(0, 0, 0.5, -8), BackgroundColor3 = C.White, Text = "Run", TextColor3 = C.Dark, Font = FONT_BOLD, TextSize = 13, BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 3 }, consolePage)
 corner(runBtn, 15)
 accentGradient(runBtn, 45)
 interactive(runBtn, 0, 0.12)
-withIcon(runBtn, "run")
-local clearBtn2 = new("TextButton", { Size = UDim2.fromOffset(90, 30), Position = UDim2.new(0, 98, 0.5, -8), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "Clear log", TextColor3 = C.Sub, Font = FONT, TextSize = 12, BorderSizePixel = 0, AutoButtonColor = false }, consolePage)
+local clearBtn2 = new("TextButton", { Size = UDim2.fromOffset(90, 30), Position = UDim2.new(0, 98, 0.5, -8), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "Clear log", TextColor3 = C.Sub, Font = FONT, TextSize = 12, BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 3 }, consolePage)
 corner(clearBtn2, 15)
 stroke(clearBtn2, 1, 0.8)
-ConsoleOutputBox = new("TextBox", { Size = UDim2.new(1, 0, 0.5, -34), Position = UDim2.new(0, 0, 0.5, 30), BackgroundColor3 = Color3.fromRGB(14, 15, 17), Text = "", PlaceholderText = "вывод...", TextColor3 = Color3.fromRGB(160, 220, 160), PlaceholderColor3 = C.Sub, Font = Enum.Font.Code, TextSize = 11, BorderSizePixel = 0, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, MultiLine = true, ClearTextOnFocus = false }, consolePage)
+ConsoleOutputBox = new("TextBox", { Size = UDim2.new(1, 0, 0.5, -34), Position = UDim2.new(0, 0, 0.5, 30), BackgroundColor3 = Color3.fromRGB(14, 15, 17), Text = "", PlaceholderText = "вывод...", TextColor3 = Color3.fromRGB(160, 220, 160), PlaceholderColor3 = C.Sub, Font = FONT_CODE, TextSize = 11, BorderSizePixel = 0, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, MultiLine = true, ClearTextOnFocus = false, ZIndex = 3 }, consolePage)
 corner(ConsoleOutputBox, 14)
 padding(ConsoleOutputBox, 8, 8, 8, 8)
 runBtn.MouseButton1Click:Connect(function() runCode(codeBox.Text, "console") end)
 clearBtn2.MouseButton1Click:Connect(function() ConsoleOutputText = ""; if ConsoleOutputBox then ConsoleOutputBox.Text = "" end end)
 
-local settingsPage = new("ScrollingFrame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = C.Accent1, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y }, content)
+local settingsPage = new("ScrollingFrame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = C.Accent1, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 2 }, content)
 Pages.settings = settingsPage
 new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, settingsPage)
 local setOrder = 0
 local function sRow(height)
     setOrder += 1
-    local row = new("Frame", { Size = UDim2.new(1, 0, 0, height or 48), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, BorderSizePixel = 0, Active = true, LayoutOrder = setOrder }, settingsPage)
+    local row = new("Frame", { Size = UDim2.new(1, 0, 0, height or 48), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, BorderSizePixel = 0, Active = true, LayoutOrder = setOrder, ZIndex = 3 }, settingsPage)
     corner(row, 14)
     stroke(row, 1, 0.85)
     row.MouseEnter:Connect(function() tween(row, 0.12, { BackgroundTransparency = 0.86 }) end)
@@ -1186,27 +1216,27 @@ local function sRow(height)
     return row
 end
 local function sLabel(row, title, desc)
-    new("TextLabel", { Size = UDim2.new(0.56, -14, 1, 0), Position = UDim2.new(0, 14, 0, 0), BackgroundTransparency = 1, Text = title, TextColor3 = C.Text, Font = FONT_BOLD, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true }, row)
-    if desc then new("TextLabel", { Size = UDim2.new(0.56, -14, 0, 14), Position = UDim2.new(0, 14, 1, -20), BackgroundTransparency = 1, Text = desc, TextColor3 = C.Sub, Font = FONT, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left }, row) end
+    new("TextLabel", { Size = UDim2.new(0.56, -14, 1, 0), Position = UDim2.new(0, 14, 0, 0), BackgroundTransparency = 1, Text = title, TextColor3 = C.Text, Font = FONT_BOLD, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true, ZIndex = 4 }, row)
+    if desc then new("TextLabel", { Size = UDim2.new(0.56, -14, 0, 14), Position = UDim2.new(0, 14, 1, -20), BackgroundTransparency = 1, Text = desc, TextColor3 = C.Sub, Font = FONT, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 4 }, row) end
 end
 local function sNum(row, title, desc, get, set, lo, hi)
     sLabel(row, title, desc)
-    local box = new("TextBox", { Size = UDim2.fromOffset(78, 28), Position = UDim2.new(1, -92, 0, 10), BackgroundColor3 = C.White, BackgroundTransparency = 0.85, Text = tostring(get()), TextColor3 = C.Text, Font = FONT, TextSize = 12, BorderSizePixel = 0, ClearTextOnFocus = false }, row)
+    local box = new("TextBox", { Size = UDim2.fromOffset(78, 28), Position = UDim2.new(1, -92, 0, 10), BackgroundColor3 = C.White, BackgroundTransparency = 0.85, Text = tostring(get()), TextColor3 = C.Text, Font = FONT, TextSize = 12, BorderSizePixel = 0, ClearTextOnFocus = false, ZIndex = 4 }, row)
     corner(box, 14)
     box.FocusLost:Connect(function() local v = tonumber(box.Text); if v then set(math.clamp(v, lo, hi)); saveSettings() else box.Text = tostring(get()) end end)
 end
 local function sToggle(row, title, desc, get, set)
     sLabel(row, title, desc)
-    local sw = new("Frame", { Size = UDim2.fromOffset(42, 22), Position = UDim2.new(1, -56, 0, 13), BackgroundColor3 = get() and C.Accent1 or C.Chip, BorderSizePixel = 0 }, row)
+    local sw = new("Frame", { Size = UDim2.fromOffset(42, 22), Position = UDim2.new(1, -56, 0, 13), BackgroundColor3 = get() and C.Accent1 or C.Chip, BorderSizePixel = 0, ZIndex = 4 }, row)
     corner(sw, 11)
-    local knob = new("Frame", { Size = UDim2.fromOffset(16, 16), Position = get() and UDim2.new(1, -19, 0, 3) or UDim2.new(0, 3, 0, 3), BackgroundColor3 = C.White, BorderSizePixel = 0 }, sw)
+    local knob = new("Frame", { Size = UDim2.fromOffset(16, 16), Position = get() and UDim2.new(1, -19, 0, 3) or UDim2.new(0, 3, 0, 3), BackgroundColor3 = C.White, BorderSizePixel = 0, ZIndex = 5 }, sw)
     corner(knob, 8)
-    local btn = new("TextButton", { Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "" }, row)
+    local btn = new("TextButton", { Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "", ZIndex = 5 }, row)
     btn.MouseButton1Click:Connect(function() local v = not get(); set(v); saveSettings(); tween(sw, 0.15, { BackgroundColor3 = v and C.Accent1 or C.Chip }); tween(knob, 0.15, { Position = v and UDim2.new(1, -19, 0, 3) or UDim2.new(0, 3, 0, 3) }) end)
 end
 local mRow = sRow(48)
 sLabel(mRow, "Модель", "free tier: flash / flash-lite")
-local mBtn = new("TextButton", { Size = UDim2.fromOffset(180, 28), Position = UDim2.new(1, -194, 0, 10), BackgroundColor3 = C.White, BackgroundTransparency = 0.85, Text = Settings.model, TextColor3 = C.Text, Font = FONT, TextSize = 12, BorderSizePixel = 0, AutoButtonColor = false }, mRow)
+local mBtn = new("TextButton", { Size = UDim2.fromOffset(180, 28), Position = UDim2.new(1, -194, 0, 10), BackgroundColor3 = C.White, BackgroundTransparency = 0.85, Text = Settings.model, TextColor3 = C.Text, Font = FONT, TextSize = 12, BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 4 }, mRow)
 corner(mBtn, 14)
 local mList = new("Frame", { Size = UDim2.fromOffset(180, #MODELS * 26 + 6), Position = UDim2.new(1, -194, 0, 44), BackgroundColor3 = C.Panel, BackgroundTransparency = 0.05, BorderSizePixel = 0, Visible = false, ZIndex = 30 }, mRow)
 corner(mList, 12)
@@ -1229,41 +1259,39 @@ sToggle(sRow(48), "AI tool: execute_lua", "разрешить ИИ выполн�
 sToggle(sRow(48), "Auto-explore", "ИИ сам исследует по таймеру", function() return Settings.autoExplore end, function(v) Settings.autoExplore = v end)
 sToggle(sRow(48), "Blur (акрил)", "размытие фона", function() return Settings.blur end, function(v) Settings.blur = v; blur.Size = v and 10 or 0 end)
 setOrder += 1
-local sysRow = new("Frame", { Size = UDim2.new(1, 0, 0, 116), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, BorderSizePixel = 0, LayoutOrder = setOrder }, settingsPage)
+local sysRow = new("Frame", { Size = UDim2.new(1, 0, 0, 116), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, BorderSizePixel = 0, LayoutOrder = setOrder, ZIndex = 3 }, settingsPage)
 corner(sysRow, 14)
 stroke(sysRow, 1, 0.85)
 sLabel(sysRow, "System prompt")
-local sysBox = new("TextBox", { Size = UDim2.new(1, -28, 1, -36), Position = UDim2.new(0, 14, 0, 32), BackgroundColor3 = C.White, BackgroundTransparency = 0.85, Text = Settings.systemPrompt, TextColor3 = C.Sub, Font = FONT, TextSize = 11, BorderSizePixel = 0, MultiLine = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ClearTextOnFocus = false }, sysRow)
+local sysBox = new("TextBox", { Size = UDim2.new(1, -28, 1, -36), Position = UDim2.new(0, 14, 0, 32), BackgroundColor3 = C.White, BackgroundTransparency = 0.85, Text = Settings.systemPrompt, TextColor3 = C.Sub, Font = FONT, TextSize = 11, BorderSizePixel = 0, MultiLine = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ClearTextOnFocus = false, ZIndex = 4 }, sysRow)
 corner(sysBox, 10)
 padding(sysBox, 6, 6, 8, 8)
 sysBox.FocusLost:Connect(function() Settings.systemPrompt = sysBox.Text; saveSettings() end)
 setOrder += 1
-local actRow = new("Frame", { Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = setOrder }, settingsPage)
+local actRow = new("Frame", { Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = setOrder, ZIndex = 3 }, settingsPage)
 new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, actRow)
-local function actBtn(title, icn, cb)
-    local b = new("TextButton", { Size = UDim2.new(0.5, -4, 1, 0), BackgroundColor3 = C.White, Text = title, TextColor3 = C.Dark, Font = FONT_BOLD, TextSize = 12, BorderSizePixel = 0, AutoButtonColor = false, LayoutOrder = #actRow:GetChildren() }, actRow)
+local function actBtn(title, cb)
+    local b = new("TextButton", { Size = UDim2.new(0.5, -4, 1, 0), BackgroundColor3 = C.White, Text = title, TextColor3 = C.Dark, Font = FONT_BOLD, TextSize = 12, BorderSizePixel = 0, AutoButtonColor = false, LayoutOrder = #actRow:GetChildren(), ZIndex = 4 }, actRow)
     corner(b, 14)
     accentGradient(b, 45)
     interactive(b, 0, 0.12)
-    withIcon(b, icn)
     b.MouseButton1Click:Connect(cb)
     return b
 end
-actBtn("⟳ Сканировать", "scan", function() pcall(scanGame); statusLbl.Text = "scan: " .. Scan.stamp; popScan({ "скан завершён " .. Scan.stamp, "remotes: " .. #Scan.remotes, "scripts: " .. #Scan.scripts }); toast("Скан: " .. #Scan.remotes .. " remotes") end)
-actBtn("🛰 Исследовать", "explore", function() switchPage("chat"); explore(DEFAULT_GOAL, false) end)
+actBtn("Scanning", function() pcall(scanGame); statusLbl.Text = "scan: " .. Scan.stamp; popScan({ "скан завершён " .. Scan.stamp, "remotes: " .. #Scan.remotes, "scripts: " .. #Scan.scripts }); toast("Скан: " .. #Scan.remotes .. " remotes") end)
+actBtn("Explore now", function() switchPage("chat"); explore(DEFAULT_GOAL, false) end)
 setOrder += 1
-local keyRow = new("Frame", { Size = UDim2.new(1, 0, 0, 78), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, BorderSizePixel = 0, LayoutOrder = setOrder }, settingsPage)
+local keyRow = new("Frame", { Size = UDim2.new(1, 0, 0, 78), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, BorderSizePixel = 0, LayoutOrder = setOrder, ZIndex = 3 }, settingsPage)
 corner(keyRow, 14)
 stroke(keyRow, 1, 0.85)
 sLabel(keyRow, "API Key", "aistudio.google.com/apikey")
-local keyBox = new("TextBox", { Size = UDim2.new(1, -118, 0, 30), Position = UDim2.new(0, 14, 1, -40), BackgroundColor3 = C.White, BackgroundTransparency = 0.85, Text = Settings.apiKey, PlaceholderText = "AIza...", TextColor3 = C.Text, PlaceholderColor3 = C.Sub, Font = Enum.Font.Code, TextSize = 12, BorderSizePixel = 0, ClearTextOnFocus = false }, keyRow)
+local keyBox = new("TextBox", { Size = UDim2.new(1, -118, 0, 30), Position = UDim2.new(0, 14, 1, -40), BackgroundColor3 = C.White, BackgroundTransparency = 0.85, Text = Settings.apiKey, PlaceholderText = "AIza...", TextColor3 = C.Text, PlaceholderColor3 = C.Sub, Font = FONT_CODE, TextSize = 12, BorderSizePixel = 0, ClearTextOnFocus = false, ZIndex = 4 }, keyRow)
 corner(keyBox, 12)
 padding(keyBox, 0, 0, 10, 10)
-local keySave = new("TextButton", { Size = UDim2.fromOffset(88, 30), Position = UDim2.new(1, -102, 1, -40), BackgroundColor3 = C.White, Text = "Save", TextColor3 = C.Dark, Font = FONT_BOLD, TextSize = 12, BorderSizePixel = 0, AutoButtonColor = false }, keyRow)
+local keySave = new("TextButton", { Size = UDim2.fromOffset(88, 30), Position = UDim2.new(1, -102, 1, -40), BackgroundColor3 = C.White, Text = "Save", TextColor3 = C.Dark, Font = FONT_BOLD, TextSize = 12, BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 4 }, keyRow)
 corner(keySave, 12)
 accentGradient(keySave, 45)
 interactive(keySave, 0, 0.12)
-withIcon(keySave, "save")
 keySave.MouseButton1Click:Connect(function()
     Settings.apiKey = keyBox.Text:gsub("%s", "")
     if Safe.writefile then pcall(function() Safe.writefile(CFG .. "/key.txt", Settings.apiKey) end) end
@@ -1272,11 +1300,10 @@ keySave.MouseButton1Click:Connect(function()
 end)
 
 local FAB_SIZE = 52
-local fab = new("TextButton", { Name = "OpenButton", Size = UDim2.fromOffset(FAB_SIZE, FAB_SIZE), Position = UDim2.fromOffset(0, 0), BackgroundColor3 = C.White, Text = "", TextColor3 = C.Dark, TextSize = 20, Font = FONT_BOLD, AutoButtonColor = false, Active = true, ZIndex = 5 }, gui)
+local fab = new("TextButton", { Name = "OpenButton", Size = UDim2.fromOffset(FAB_SIZE, FAB_SIZE), Position = UDim2.fromOffset(0, 0), BackgroundColor3 = C.White, Text = "R", TextColor3 = C.Dark, TextSize = 22, Font = FONT_BOLD, AutoButtonColor = false, Active = true, ZIndex = 5 }, gui)
 corner(fab, FAB_SIZE / 2)
 accentGradient(fab, 45)
 stroke(fab, 1.5, 0.4)
-local FabIcon = new("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = iconUrl("open"), ScaleType = Enum.ScaleType.Fit, ZIndex = 6, Active = false }, fab)
 do
     local vpp = Camera.ViewportSize
     local defX = vpp.X - FAB_SIZE - 24
@@ -1292,16 +1319,14 @@ setOpen = function(open)
         windowScale.Scale = 0.9
         tween(windowScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
         tween(blur, 0.4, { Size = Settings.blur and 10 or 0 })
-        FabIcon.Image = iconUrl("close")
-        fab.Text = "✕"
+        fab.Text = "X"
     else
         closeFileModal()
         closeHistoryModal()
         tween(windowScale, 0.2, { Scale = 0.9 })
         tween(blur, 0.2, { Size = 0 })
         task.delay(0.2, function() if not isOpen then window.Visible = false end end)
-        FabIcon.Image = iconUrl("open")
-        fab.Text = "◇"
+        fab.Text = "R"
     end
 end
 do
@@ -1337,7 +1362,7 @@ do
     end)
 end
 
-local resizeGrip = new("TextButton", { Name = "ResizeGrip", AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -2, 1, -2), Size = UDim2.fromOffset(20, 20), BackgroundTransparency = 1, Text = "◢", TextColor3 = C.Sub, TextSize = 12, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 6 }, window)
+local resizeGrip = new("TextButton", { Name = "ResizeGrip", AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -2, 1, -2), Size = UDim2.fromOffset(20, 20), BackgroundTransparency = 1, Text = "<>", TextColor3 = C.Sub, TextSize = 10, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 6 }, window)
 do
     local rz, rs, rw, rh = false, nil, 0, 0
     resizeGrip.InputBegan:Connect(function(i)
@@ -1359,12 +1384,11 @@ end
 
 UserInputService.InputBegan:Connect(function(i, processed) if not processed and i.KeyCode == Enum.KeyCode.RightControl then setOpen(not isOpen) end end)
 
-local function headerIcon(glyph, name, xOff, cb)
-    local b = new("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, xOff, 0.5, 0), Size = UDim2.fromOffset(34, 34), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = glyph, TextColor3 = C.Text, TextSize = 18, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 4 }, header)
+local function headerIcon(title, xOff, wide, cb)
+    local b = new("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, xOff, 0.5, 0), Size = UDim2.fromOffset(wide, 34), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = title, TextColor3 = C.Text, TextSize = 12, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 4 }, header)
     corner(b, 17)
     stroke(b, 1, 0.8)
     interactive(b, 0.9, 0.78)
-    withIcon(b, name)
     b.MouseButton1Click:Connect(cb)
     return b
 end
@@ -1373,11 +1397,11 @@ setBlurOffAndDestroy = function()
     gui:Destroy()
     getgenv().RealexGeminiChat = nil
 end
-headerIcon("×", "close", -14, function() setBlurOffAndDestroy() end)
-headerIcon("—", "minimize", -56, function() setOpen(false) end)
-headerIcon("◷", "history", -98, function() openHistoryModal() end)
-headerIcon("↻", "new", -140, function() if busy then return end newHistory(false) end)
-headerIcon("🗑", "clear", -182, function() clearChat() end)
+headerIcon("Close", -14, 48, function() setBlurOffAndDestroy() end)
+headerIcon("Min", -66, 40, function() setOpen(false) end)
+headerIcon("Hist", -110, 42, function() openHistoryModal() end)
+headerIcon("New", -156, 42, function() if busy then return end newHistory(false) end)
+headerIcon("Clear", -202, 48, function() clearChat() end)
 
 do
     local dragging, dragStart, startPos
@@ -1404,8 +1428,8 @@ task.spawn(function()
     renderReaderList("")
     for k, bb in pairs(rCatBtns) do if k == "remotes" then bb.BackgroundColor3 = C.Accent1; bb.TextColor3 = C.Dark end end
     renderChat()
-    popScan({ "🛰 place preview", "remotes: " .. #Scan.remotes, "scripts: " .. #Scan.scripts, "workspace: " .. #Scan.workspaceTop })
-    addMessage("Realex Gemini готов. Обычный чат отвечает сразу без скана игры. Разведка — /explore <цель> или кнопка в Settings. Истории — ◷ в шапке. Очистить — 🗑. Свернуть — —. Модель видна в шапке справа. Модель: " .. Settings.model .. (Settings.apiKey == "" and "\n⚠ Вставь API-ключ в Settings." or ""), false)
+    popScan({ "PLACE PREVIEW", "remotes: " .. #Scan.remotes, "scripts: " .. #Scan.scripts, "workspace: " .. #Scan.workspaceTop })
+    addMessage("Realex Gemini готов. Обычный чат отвечает сразу без скана игры. Разведка — /explore <цель> или кнопка Explore now в Set. Истории — Hist в шапке. Очистить — Clear. Свернуть — Min. Модель видна в шапке справа. Текущая модель: " .. Settings.model .. (Settings.apiKey == "" and "\n! Вставь API-ключ в Set." or ""), false)
 end)
 task.spawn(function()
     local timer = 0
