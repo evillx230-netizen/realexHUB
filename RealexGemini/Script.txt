@@ -566,11 +566,17 @@ local function splitCodeBlocks(text)
     return blocks, table.concat(rest, ""):gsub("^%s+", ""):gsub("%s+$", "")
 end
 local function makeCodeCard(parent, block, layoutOrder)
-    local card = new("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = C.CodeBg, BorderSizePixel = 0, LayoutOrder = layoutOrder, ZIndex = 4 }, parent)
+    local visual = 0
+    for line in (block.code .. "\n"):gmatch("([^\n]*)\n") do
+        visual += math.max(1, math.ceil(#line / 70))
+    end
+    local bodyH = math.clamp(visual * 17 + 14, 64, 400)
+    local card = new("Frame", { Size = UDim2.new(1, 0, 0, 30 + bodyH + 6), BackgroundColor3 = C.CodeBg, BorderSizePixel = 0, LayoutOrder = layoutOrder, ZIndex = 4 }, parent)
     corner(card, 10)
     stroke(card, 1, 0.7, C.Chip)
     local head = new("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = C.CodeHead, BorderSizePixel = 0, ZIndex = 5 }, card)
     corner(head, 10)
+    new("Frame", { Size = UDim2.new(1, 0, 0, 12), Position = UDim2.new(0, 0, 1, -12), BackgroundColor3 = C.CodeHead, BorderSizePixel = 0, ZIndex = 5 }, head)
     new("TextLabel", { Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -170, 1, 0), BackgroundTransparency = 1, Text = "``` " .. block.lang, TextColor3 = C.Sub, TextSize = 12, Font = FONT_CODE, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6 }, head)
     local cpBtn = new("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(74, 22), BackgroundColor3 = C.Chip, Text = "Copy Code", TextColor3 = C.Text, TextSize = 11, Font = FONT_BOLD, BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 6 }, head)
     corner(cpBtn, 6)
@@ -590,18 +596,9 @@ local function makeCodeCard(parent, block, layoutOrder)
         switchPage("console")
         runCode(block.code, "AI code")
     end)
-    local bodyScroll = new("ScrollingFrame", { Size = UDim2.new(1, -16, 0, 60), Position = UDim2.new(0, 8, 0, 34), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = C.Accent1, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 5 }, card)
+    local bodyScroll = new("ScrollingFrame", { Size = UDim2.new(1, -16, 0, bodyH), Position = UDim2.new(0, 8, 0, 34), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = C.Accent1, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 5 }, card)
     padding(bodyScroll, 8, 6, 8, 6)
-    local body = new("TextLabel", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, Text = block.code, TextColor3 = C.CodeTxt, TextSize = 12, Font = FONT_CODE, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 6 }, bodyScroll)
-    local function fix()
-        if not body.Parent then return end
-        local h = math.clamp(body.AbsoluteSize.Y + 12, 40, 400)
-        bodyScroll.Size = UDim2.new(1, -16, 0, h)
-        card.Size = UDim2.new(1, 0, 0, 30 + h + 6)
-    end
-    body:GetPropertyChangedSignal("AbsoluteSize"):Connect(fix)
-    task.defer(fix)
-    task.delay(0.2, fix)
+    new("TextLabel", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, Text = block.code, TextColor3 = C.CodeTxt, TextSize = 12, Font = FONT_CODE, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 6 }, bodyScroll)
     return card
 end
 addMessage = function(text, isUser, layoutOrder, file)
@@ -724,13 +721,17 @@ local function syncLayout()
     local bh = math.clamp(ih + 36, 56, 196)
     inputBar.Size = UDim2.new(1, -32, 0, bh)
     input.Position = UDim2.new(0, 58, 0, math.floor((bh - ih) / 2))
-    content.Size = UDim2.new(1, -32, 1, -106 - (bh + 16))
+    content.Size = UDim2.new(1, -32, 1, -(106 + bh + 16))
     pending.Position = UDim2.new(0, 16, 1, -(bh + 20))
 end
 input:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncLayout)
 input:GetPropertyChangedSignal("Text"):Connect(syncLayout)
 window:GetPropertyChangedSignal("Size"):Connect(syncLayout)
+window:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncLayout)
+RunService.RenderStepped:Wait()
 task.defer(syncLayout)
+task.delay(0.3, syncLayout)
+task.delay(0.8, syncLayout)
 input.Focused:Connect(function() tween(inputStroke, 0.25, { Color = C.Accent1, Transparency = 0.1 }) end)
 input.FocusLost:Connect(function(enterPressed)
     tween(inputStroke, 0.25, { Color = C.White, Transparency = 0.7 })
@@ -1209,7 +1210,7 @@ new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.Layou
 local setOrder = 0
 local function sRow(height)
     setOrder += 1
-    local row = new("Frame", { Size = UDim2.new(1, 0, 0, height or 48), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, BorderSizePixel = 0, Active = true, LayoutOrder = setOrder, ZIndex = 3 }, settingsPage)
+    local row = new("Frame", { Size = UDim2.new(1, 0, 0, height or 48), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, BorderSizePixel = 0, Active = true, LayoutOrder = setOrder, ZIndex = 3, ClipsDescendants = true }, settingsPage)
     corner(row, 14)
     stroke(row, 1, 0.85)
     row.MouseEnter:Connect(function() tween(row, 0.12, { BackgroundTransparency = 0.86 }) end)
@@ -1239,17 +1240,30 @@ local mRow = sRow(48)
 sLabel(mRow, "Модель", "free tier: flash / flash-lite")
 local mBtn = new("TextButton", { Size = UDim2.fromOffset(180, 28), Position = UDim2.new(1, -194, 0, 10), BackgroundColor3 = C.White, BackgroundTransparency = 0.85, Text = Settings.model, TextColor3 = C.Text, Font = FONT, TextSize = 12, BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 4 }, mRow)
 corner(mBtn, 14)
-local mList = new("Frame", { Size = UDim2.fromOffset(180, #MODELS * 26 + 6), Position = UDim2.new(1, -194, 0, 44), BackgroundColor3 = C.Panel, BackgroundTransparency = 0.05, BorderSizePixel = 0, Visible = false, ZIndex = 30 }, mRow)
+local mBackdrop = new("TextButton", { Name = "ModelBackdrop", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, Visible = false, ZIndex = 34 }, window)
+local mList = new("Frame", { Size = UDim2.fromOffset(180, #MODELS * 26 + 6), Position = UDim2.fromOffset(0, 0), BackgroundColor3 = C.Panel, BackgroundTransparency = 0.05, BorderSizePixel = 0, Visible = false, ZIndex = 35 }, window)
 corner(mList, 12)
 stroke(mList, 1, 0.6)
-local mScroll = new("ScrollingFrame", { Size = UDim2.new(1, -6, 1, -6), Position = UDim2.new(0, 3, 0, 3), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 0, CanvasSize = UDim2.new(0, 0, 0, #MODELS * 26), ZIndex = 31 }, mList)
+local mScroll = new("ScrollingFrame", { Size = UDim2.new(1, -6, 1, -6), Position = UDim2.new(0, 3, 0, 3), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 0, CanvasSize = UDim2.new(0, 0, 0, #MODELS * 26), ZIndex = 36 }, mList)
 new("UIListLayout", { Padding = UDim.new(0, 2) }, mScroll)
-for _, m in ipairs(MODELS) do
-    local b = new("TextButton", { Size = UDim2.new(1, -2, 0, 24), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "  " .. m, TextColor3 = C.Sub, Font = FONT, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, BorderSizePixel = 0, ZIndex = 32, AutoButtonColor = false }, mScroll)
-    corner(b, 6)
-    b.MouseButton1Click:Connect(function() Settings.model = m; mBtn.Text = m; mList.Visible = false; saveSettings(); updateModelLbl(); toast("Модель: " .. m) end)
+local function closeModelList() mList.Visible = false; mBackdrop.Visible = false end
+local function openModelList()
+    local sc = windowScale.Scale
+    if sc <= 0 then sc = 1 end
+    local x = (mBtn.AbsolutePosition.X - window.AbsolutePosition.X) / sc
+    local y = (mBtn.AbsolutePosition.Y + mBtn.AbsoluteSize.Y + 4 - window.AbsolutePosition.Y) / sc
+    mList.Position = UDim2.fromOffset(x, y)
+    mList.Visible = true
+    mBackdrop.Visible = true
 end
-mBtn.MouseButton1Click:Connect(function() mList.Visible = not mList.Visible end)
+for _, m in ipairs(MODELS) do
+    local b = new("TextButton", { Size = UDim2.new(1, -2, 0, 24), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "  " .. m, TextColor3 = C.Sub, Font = FONT, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, BorderSizePixel = 0, ZIndex = 37, AutoButtonColor = false }, mScroll)
+    corner(b, 6)
+    b.MouseButton1Click:Connect(function() Settings.model = m; mBtn.Text = m; closeModelList(); saveSettings(); updateModelLbl(); toast("Модель: " .. m) end)
+end
+mBtn.MouseButton1Click:Connect(function() if mList.Visible then closeModelList() else openModelList() end end)
+mBackdrop.MouseButton1Click:Connect(closeModelList)
+settingsPage:GetPropertyChangedSignal("CanvasPosition"):Connect(closeModelList)
 sNum(sRow(48), "Temperature", "0.0 — 2.0", function() return Settings.temperature end, function(v) Settings.temperature = v end, 0, 2)
 sNum(sRow(48), "Max tool rounds", "шагов разведки (для /explore)", function() return Settings.maxRounds end, function(v) Settings.maxRounds = math.floor(v) end, 1, 12)
 sNum(sRow(48), "Auto-explore interval", "минуты между разведками", function() return Settings.exploreInterval end, function(v) Settings.exploreInterval = math.floor(v) end, 1, 120)
@@ -1260,11 +1274,11 @@ sToggle(sRow(48), "AI tool: execute_lua", "разрешить ИИ выполн�
 sToggle(sRow(48), "Auto-explore", "ИИ сам исследует по таймеру", function() return Settings.autoExplore end, function(v) Settings.autoExplore = v end)
 sToggle(sRow(48), "Blur (акрил)", "размытие фона", function() return Settings.blur end, function(v) Settings.blur = v; blur.Size = v and 10 or 0 end)
 setOrder += 1
-local sysRow = new("Frame", { Size = UDim2.new(1, 0, 0, 116), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, BorderSizePixel = 0, LayoutOrder = setOrder, ZIndex = 3 }, settingsPage)
+local sysRow = new("Frame", { Size = UDim2.new(1, 0, 0, 116), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, BorderSizePixel = 0, LayoutOrder = setOrder, ZIndex = 3, ClipsDescendants = true }, settingsPage)
 corner(sysRow, 14)
 stroke(sysRow, 1, 0.85)
 sLabel(sysRow, "System prompt")
-local sysBox = new("TextBox", { Size = UDim2.new(1, -28, 1, -36), Position = UDim2.new(0, 14, 0, 32), BackgroundColor3 = C.White, BackgroundTransparency = 0.85, Text = Settings.systemPrompt, TextColor3 = C.Sub, Font = FONT, TextSize = 11, BorderSizePixel = 0, MultiLine = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ClearTextOnFocus = false, ZIndex = 4 }, sysRow)
+local sysBox = new("TextBox", { Size = UDim2.new(1, -28, 1, -36), Position = UDim2.new(0, 14, 0, 32), BackgroundColor3 = C.White, BackgroundTransparency = 0.85, Text = Settings.systemPrompt, TextColor3 = C.Sub, Font = FONT, TextSize = 11, BorderSizePixel = 0, MultiLine = true, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ClearTextOnFocus = false, ZIndex = 4 }, sysRow)
 corner(sysBox, 10)
 padding(sysBox, 6, 6, 8, 8)
 sysBox.FocusLost:Connect(function() Settings.systemPrompt = sysBox.Text; saveSettings() end)
@@ -1282,7 +1296,7 @@ end
 actBtn("Scanning", function() pcall(scanGame); statusLbl.Text = "scan: " .. Scan.stamp; popScan({ "скан завершён " .. Scan.stamp, "remotes: " .. #Scan.remotes, "scripts: " .. #Scan.scripts }); toast("Скан: " .. #Scan.remotes .. " remotes") end)
 actBtn("Explore now", function() switchPage("chat"); explore(DEFAULT_GOAL, false) end)
 setOrder += 1
-local keyRow = new("Frame", { Size = UDim2.new(1, 0, 0, 78), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, BorderSizePixel = 0, LayoutOrder = setOrder, ZIndex = 3 }, settingsPage)
+local keyRow = new("Frame", { Size = UDim2.new(1, 0, 0, 78), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, BorderSizePixel = 0, LayoutOrder = setOrder, ZIndex = 3, ClipsDescendants = true }, settingsPage)
 corner(keyRow, 14)
 stroke(keyRow, 1, 0.85)
 sLabel(keyRow, "API Key", "aistudio.google.com/apikey")
@@ -1324,6 +1338,7 @@ setOpen = function(open)
     else
         closeFileModal()
         closeHistoryModal()
+        closeModelList()
         tween(windowScale, 0.2, { Scale = 0.9 })
         tween(blur, 0.2, { Size = 0 })
         task.delay(0.2, function() if not isOpen then window.Visible = false end end)
