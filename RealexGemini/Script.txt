@@ -566,13 +566,11 @@ local function splitCodeBlocks(text)
     return blocks, table.concat(rest, ""):gsub("^%s+", ""):gsub("%s+$", "")
 end
 local function makeCodeCard(parent, block, layoutOrder)
-    local card = new("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = C.CodeBg, BorderSizePixel = 0, LayoutOrder = layoutOrder, ZIndex = 4 }, parent)
+    local card = new("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = C.CodeBg, BorderSizePixel = 0, LayoutOrder = layoutOrder, ZIndex = 4 }, parent)
     corner(card, 10)
     stroke(card, 1, 0.7, C.Chip)
-    new("UIListLayout", { Padding = UDim.new(0, 0), SortOrder = Enum.SortOrder.LayoutOrder }, card)
-    local head = new("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = C.CodeHead, BorderSizePixel = 0, LayoutOrder = 1, ZIndex = 5 }, card)
-    new("UICorner", { CornerRadius = UDim.new(0, 10) }, head)
-    new("Frame", { Size = UDim2.new(1, 0, 0, 10), Position = UDim2.new(0, 0, 1, -10), BackgroundColor3 = C.CodeHead, BorderSizePixel = 0, ZIndex = 5 }, head)
+    local head = new("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = C.CodeHead, BorderSizePixel = 0, ZIndex = 5 }, card)
+    corner(head, 10)
     new("TextLabel", { Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -170, 1, 0), BackgroundTransparency = 1, Text = "``` " .. block.lang, TextColor3 = C.Sub, TextSize = 12, Font = FONT_CODE, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6 }, head)
     local cpBtn = new("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(74, 22), BackgroundColor3 = C.Chip, Text = "Copy Code", TextColor3 = C.Text, TextSize = 11, Font = FONT_BOLD, BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 6 }, head)
     corner(cpBtn, 6)
@@ -592,15 +590,18 @@ local function makeCodeCard(parent, block, layoutOrder)
         switchPage("console")
         runCode(block.code, "AI code")
     end)
-    local body = new("TextBox", {
-        Size = UDim2.new(1, -16, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
-        Position = UDim2.new(0, 8, 0, 34), BackgroundTransparency = 1, Text = block.code,
-        TextColor3 = C.CodeTxt, TextSize = 12, Font = FONT_CODE,
-        TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
-        MultiLine = true, ReadOnly = true, ClearTextOnFocus = false, ZIndex = 5,
-    }, card)
-    new("UISizeConstraint", { MinSize = Vector2.new(0, 30), MaxSize = Vector2.new(math.huge, 600) }, body)
-    padding(body, 8, 6, 8, 6)
+    local bodyScroll = new("ScrollingFrame", { Size = UDim2.new(1, -16, 0, 60), Position = UDim2.new(0, 8, 0, 34), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = C.Accent1, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 5 }, card)
+    padding(bodyScroll, 8, 6, 8, 6)
+    local body = new("TextLabel", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, Text = block.code, TextColor3 = C.CodeTxt, TextSize = 12, Font = FONT_CODE, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 6 }, bodyScroll)
+    local function fix()
+        if not body.Parent then return end
+        local h = math.clamp(body.AbsoluteSize.Y + 12, 40, 400)
+        bodyScroll.Size = UDim2.new(1, -16, 0, h)
+        card.Size = UDim2.new(1, 0, 0, 30 + h + 6)
+    end
+    body:GetPropertyChangedSignal("AbsoluteSize"):Connect(fix)
+    task.defer(fix)
+    task.delay(0.2, fix)
     return card
 end
 addMessage = function(text, isUser, layoutOrder, file)
