@@ -37,6 +37,7 @@ local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
 
 local GIT = { user = "evillx230-netizen", repo = "realexHUB", branch = "main", dir = "RealexGemini" }
 local ICON_BASE = "https://raw.githubusercontent.com/" .. GIT.user .. "/" .. GIT.repo .. "/" .. GIT.branch .. "/" .. GIT.dir .. "/dem/"
@@ -106,6 +107,7 @@ local busy = false
 local renderChat, renderHistoryList, openHistoryModal, closeHistoryModal, openFileModal, closeFileModal
 local sendMessageRef, runCode, toast, explore, setOpen, clearChat, newHistory, loadHistory, deleteHistory
 local saveCur, addMessage, showTyping, typewrite, pushMsg, agentRun, geminiRaw, switchPage
+local popScan, updateModelLbl
 
 local HistIndex = {}
 local Cur = { id = nil, title = "Новый чат", msgs = {} }
@@ -474,8 +476,13 @@ getgenv().RealexGeminiChat = gui
 local blur = new("BlurEffect", { Name = "RealexBlur", Size = Settings.blur and 10 or 0 }, Lighting)
 gui.Destroying:Connect(function() blur:Destroy() end)
 
-local window = new("Frame", { Name = "Window", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.9, 0.82), BackgroundColor3 = C.White, BackgroundTransparency = 0.1, BorderSizePixel = 0, Active = true }, gui)
-new("UISizeConstraint", { MaxSize = Vector2.new(520, 680), MinSize = Vector2.new(320, 420) }, window)
+local WIN_MIN = Vector2.new(560, 420)
+local WIN_MAX = Vector2.new(820, 600)
+local vp = Camera.ViewportSize
+local winW = math.clamp(vp.X * 0.62, WIN_MIN.X, WIN_MAX.X)
+local winH = math.clamp(vp.Y * 0.74, WIN_MIN.Y, WIN_MAX.Y)
+
+local window = new("Frame", { Name = "Window", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(winW, winH), BackgroundColor3 = C.White, BackgroundTransparency = 0.1, BorderSizePixel = 0, Active = true }, gui)
 local windowScale = new("UIScale", { Scale = 0.9 }, window)
 corner(window, 26)
 new("UIGradient", { Color = ColorSequence.new(C.BgTop, C.Bg), Rotation = 125 }, window)
@@ -491,12 +498,17 @@ local avatar = new("Frame", { Position = UDim2.fromOffset(16, 12), Size = UDim2.
 corner(avatar, 20)
 accentGradient(avatar, 45)
 stroke(avatar, 1, 0.5)
-new("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AI", TextColor3 = C.Dark, TextSize = 15, Font = FONT_BOLD, ZIndex = 3 }, avatar)
-withIcon(avatar, "ai")
-new("TextLabel", { Position = UDim2.fromOffset(66, 11), Size = UDim2.new(1, -230, 0, 22), BackgroundTransparency = 1, Text = "Realex Gemini", TextColor3 = C.Text, TextSize = 17, Font = FONT_BOLD, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 3 }, header)
+new("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "✦", TextColor3 = C.Dark, TextSize = 18, Font = FONT_BOLD, ZIndex = 3 }, avatar)
+withIcon(avatar, "shine")
+new("TextLabel", { Position = UDim2.fromOffset(66, 11), Size = UDim2.new(1, -360, 0, 22), BackgroundTransparency = 1, Text = "Realex Gemini", TextColor3 = C.Text, TextSize = 17, Font = FONT_BOLD, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 3 }, header)
 local dot = new("Frame", { Position = UDim2.fromOffset(66, 39), Size = UDim2.fromOffset(8, 8), BackgroundColor3 = C.Green, BorderSizePixel = 0, ZIndex = 3 }, header)
 corner(dot, 4)
-local statusLbl = new("TextLabel", { Position = UDim2.fromOffset(80, 33), Size = UDim2.new(1, -240, 0, 20), BackgroundTransparency = 1, Text = "scan: ...", TextColor3 = C.Sub, TextSize = 12, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 3 }, header)
+local statusLbl = new("TextLabel", { Position = UDim2.fromOffset(80, 33), Size = UDim2.new(1, -370, 0, 20), BackgroundTransparency = 1, Text = "scan: ...", TextColor3 = C.Sub, TextSize = 12, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 3 }, header)
+local modelChip = new("Frame", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -232, 0.5, 0), Size = UDim2.fromOffset(132, 24), BackgroundColor3 = C.White, BackgroundTransparency = 0.88, BorderSizePixel = 0, ZIndex = 3 }, header)
+corner(modelChip, 12)
+stroke(modelChip, 1, 0.7)
+local modelChipLbl = new("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = Settings.model, TextColor3 = C.Text, TextSize = 11, Font = FONT_BOLD, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 4 }, modelChip)
+updateModelLbl = function() if modelChipLbl and modelChipLbl.Parent then modelChipLbl.Text = Settings.model end end
 local divider = new("Frame", { Position = UDim2.fromOffset(0, 64), Size = UDim2.new(1, 0, 0, 1), BackgroundColor3 = C.White, BorderSizePixel = 0, ZIndex = 2 }, window)
 new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.82), NumberSequenceKeypoint.new(1, 1) }) }, divider)
 
@@ -559,7 +571,7 @@ addMessage = function(text, isUser, layoutOrder, file)
     local label
     if text ~= "" then
         label = new("TextLabel", { LayoutOrder = lo, AutomaticSize = Enum.AutomaticSize.XY, Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, Text = text, TextWrapped = true, TextColor3 = isUser and C.Dark or C.Text, TextSize = 14, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left }, bubble)
-        new("UISizeConstraint", { MaxSize = Vector2.new(320, math.huge) }, label)
+        new("UISizeConstraint", { MaxSize = Vector2.new(360, math.huge) }, label)
     end
     local hasCode = (text or ""):find("```") ~= nil
     if hasCode and not isUser then
@@ -663,7 +675,7 @@ local function mkOverlay(name)
     local ov = new("Frame", { Name = name, Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false, Active = true, ZIndex = 20 }, window)
     corner(ov, 26)
     local card = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, -40, 0.82, 0), BackgroundColor3 = C.Panel, BackgroundTransparency = 0.03, BorderSizePixel = 0 }, ov)
-    new("UISizeConstraint", { MaxSize = Vector2.new(420, 420), MinSize = Vector2.new(0, 300) }, card)
+    new("UISizeConstraint", { MaxSize = Vector2.new(460, 440), MinSize = Vector2.new(0, 300) }, card)
     corner(card, 20)
     stroke(card, 1.2, 0.7)
     local cs = new("UIScale", { Scale = 0.92 }, card)
@@ -789,6 +801,40 @@ toast = function(text, dur)
     task.delay(dur or 2.5, function() if t and t.Parent then t:Destroy() end end)
 end
 
+local popToken = 0
+popScan = function(lines)
+    popToken += 1
+    local myToken = popToken
+    for _, old in ipairs(window:GetChildren()) do if old.Name == "ScanPop" then old:Destroy() end end
+    local panel = new("Frame", { Name = "ScanPop", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 70), Size = UDim2.fromOffset(math.min(window.Size.X.Offset - 60, 360), 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = C.Panel, BackgroundTransparency = 0.06, BorderSizePixel = 0, ZIndex = 30 }, window)
+    corner(panel, 16)
+    local ps = stroke(panel, 1.4, 0.25, C.Accent1)
+    accentGradient(ps, 45)
+    padding(panel, 14, 10, 14, 12)
+    new("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }, panel)
+    local head = new("TextLabel", { Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, Text = "🛰 place preview", TextColor3 = C.Accent1, TextSize = 12, Font = FONT_BOLD, TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = 0, ZIndex = 31 }, panel)
+    local bodyLines = {}
+    for i, ln in ipairs(lines) do
+        local l = new("TextLabel", { Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, Text = ln, TextColor3 = C.Text, TextSize = 12, Font = FONT, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, LayoutOrder = i, BackgroundTransparency2 = 1, ZIndex = 31 }, panel)
+        l.TextTransparency = 1
+        bodyLines[i] = l
+    end
+    local sc = new("UIScale", { Scale = 0.9 }, panel)
+    tween(sc, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
+    for i, l in ipairs(bodyLines) do
+        task.delay(0.08 * i, function() if l and l.Parent and popToken == myToken then tween(l, 0.25, { TextTransparency = 0 }) end end)
+    end
+    task.delay(0.08 * #bodyLines + 1.6, function()
+        if popToken ~= myToken or not panel.Parent then return end
+        for _, l in ipairs(bodyLines) do if l.Parent then tween(l, 0.4, { TextTransparency = 1 }) end end
+        tween(head, 0.4, { TextTransparency = 1 })
+        tween(ps, 0.4, { Transparency = 1 })
+        tween(panel, 0.4, { BackgroundTransparency = 1 })
+        tween(sc, 0.4, { Scale = 0.92 })
+        task.delay(0.45, function() if panel.Parent then panel:Destroy() end end)
+    end)
+end
+
 local ConsoleOutputText = ""
 local ConsoleOutputBox = nil
 local function consoleLog(line)
@@ -882,6 +928,7 @@ explore = function(goal, auto)
     if busy then if not auto then toast("ИИ уже исследует") end return end
     busy = true
     chips.Visible = false
+    popScan({ "🔍 explore запущен", goal:sub(1, 46) .. (goal:len() > 46 and "…" or "") })
     addMessage((auto and "[🤖 AUTO] " or "[🔍 EXPLORE] ") .. goal, true)
     pushMsg("user", "[explore] " .. goal:sub(1, 200))
     local contents = {}
@@ -912,7 +959,7 @@ sendMessageRef = function(rawText)
     local file = attached
     if (text == "" and not file) or busy then return end
     if text == "/clear" then clearChat(); return end
-    if text == "/scan" then busy = true; pcall(scanGame); statusLbl.Text = "scan: " .. Scan.stamp; addMessage("Скан обновлён " .. Scan.stamp .. " · remotes: " .. #Scan.remotes .. " · scripts: " .. #Scan.scripts, false); busy = false; return end
+    if text == "/scan" then busy = true; pcall(scanGame); statusLbl.Text = "scan: " .. Scan.stamp; popScan({ "скан завершён " .. Scan.stamp, "remotes: " .. #Scan.remotes, "scripts: " .. #Scan.scripts, "workspace: " .. #Scan.workspaceTop }); addMessage("Скан обновлён " .. Scan.stamp .. " · remotes: " .. #Scan.remotes .. " · scripts: " .. #Scan.scripts, false); busy = false; return end
     if text == "/explore" or text:sub(1, 9) == "/explore " then clearAttachment(); explore((text == "/explore") and DEFAULT_GOAL or text:sub(10), false); return end
     busy = true
     chips.Visible = false
@@ -1121,7 +1168,7 @@ new("UIListLayout", { Padding = UDim.new(0, 2) }, mScroll)
 for _, m in ipairs(MODELS) do
     local b = new("TextButton", { Size = UDim2.new(1, -2, 0, 24), BackgroundColor3 = C.White, BackgroundTransparency = 0.9, Text = "  " .. m, TextColor3 = C.Sub, Font = FONT, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, BorderSizePixel = 0, ZIndex = 32, AutoButtonColor = false }, mScroll)
     corner(b, 6)
-    b.MouseButton1Click:Connect(function() Settings.model = m; mBtn.Text = m; mList.Visible = false; saveSettings(); toast("Модель: " .. m) end)
+    b.MouseButton1Click:Connect(function() Settings.model = m; mBtn.Text = m; mList.Visible = false; saveSettings(); updateModelLbl(); toast("Модель: " .. m) end)
 end
 mBtn.MouseButton1Click:Connect(function() mList.Visible = not mList.Visible end)
 sNum(sRow(48), "Temperature", "0.0 — 2.0", function() return Settings.temperature end, function(v) Settings.temperature = v end, 0, 2)
@@ -1154,7 +1201,7 @@ local function actBtn(title, icn, cb)
     b.MouseButton1Click:Connect(cb)
     return b
 end
-actBtn("⟳ Сканировать", "scan", function() pcall(scanGame); statusLbl.Text = "scan: " .. Scan.stamp; toast("Скан: " .. #Scan.remotes .. " remotes") end)
+actBtn("⟳ Сканировать", "scan", function() pcall(scanGame); statusLbl.Text = "scan: " .. Scan.stamp; popScan({ "скан завершён " .. Scan.stamp, "remotes: " .. #Scan.remotes, "scripts: " .. #Scan.scripts }); toast("Скан: " .. #Scan.remotes .. " remotes") end)
 actBtn("🛰 Исследовать", "explore", function() switchPage("chat"); explore(DEFAULT_GOAL, false) end)
 setOrder += 1
 local keyRow = new("Frame", { Size = UDim2.new(1, 0, 0, 78), BackgroundColor3 = C.White, BackgroundTransparency = 0.92, BorderSizePixel = 0, LayoutOrder = setOrder }, settingsPage)
@@ -1176,31 +1223,94 @@ keySave.MouseButton1Click:Connect(function()
     toast(Settings.apiKey ~= "" and "Ключ сохранён" or "Ключ очищен")
 end)
 
-local fab = new("TextButton", { Name = "OpenButton", AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -24, 1, -24), Size = UDim2.fromOffset(56, 56), BackgroundColor3 = C.White, Text = "◆", TextColor3 = C.Dark, TextSize = 20, Font = FONT_BOLD, AutoButtonColor = false, Visible = false, ZIndex = 5 }, gui)
-corner(fab, 28)
+local FAB_SIZE = 52
+local fab = new("TextButton", { Name = "OpenButton", Size = UDim2.fromOffset(FAB_SIZE, FAB_SIZE), Position = UDim2.fromOffset(0, 0), BackgroundColor3 = C.White, Text = "", TextColor3 = C.Dark, TextSize = 20, Font = FONT_BOLD, AutoButtonColor = false, Active = true, ZIndex = 5 }, gui)
+corner(fab, FAB_SIZE / 2)
 accentGradient(fab, 45)
 stroke(fab, 1.5, 0.4)
-interactive(fab, 0, 0.1)
-withIcon(fab, "float")
+local FabIcon = new("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = iconUrl("open"), ScaleType = Enum.ScaleType.Fit, ZIndex = 6, Active = false }, fab)
+
+do
+    local vpp = Camera.ViewportSize
+    local defX = vpp.X - FAB_SIZE - 24
+    local defY = vpp.Y / 2 - FAB_SIZE / 2
+    fab.Position = UDim2.fromOffset(math.clamp(Settings.floatX or defX, 0, vpp.X - FAB_SIZE), math.clamp(Settings.floatY or defY, 0, vpp.Y - FAB_SIZE))
+end
 
 local isOpen = true
 setOpen = function(open)
     isOpen = open
     if open then
-        fab.Visible = false
         window.Visible = true
         windowScale.Scale = 0.9
         tween(windowScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
         tween(blur, 0.4, { Size = Settings.blur and 10 or 0 })
+        FabIcon.Image = iconUrl("close")
+        fab.Text = "✕"
     else
         closeFileModal()
         closeHistoryModal()
         tween(windowScale, 0.2, { Scale = 0.9 })
         tween(blur, 0.2, { Size = 0 })
-        task.delay(0.2, function() if not isOpen then window.Visible = false; fab.Visible = true end end)
+        task.delay(0.2, function() if not isOpen then window.Visible = false end end)
+        FabIcon.Image = iconUrl("open")
+        fab.Text = "◇"
     end
 end
-fab.MouseButton1Click:Connect(function() setOpen(true) end)
+
+do
+    local dragging, dragStart, startPos, moved = false, nil, nil, 0
+    fab.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            dragging, moved = true, 0
+            dragStart = i.Position
+            startPos = fab.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(i)
+        if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+            local d = i.Position - dragStart
+            moved = math.max(moved, math.abs(d.X) + math.abs(d.Y))
+            local v = Camera.ViewportSize
+            fab.Position = UDim2.fromOffset(math.clamp(startPos.X.Offset + d.X, 0, v.X - FAB_SIZE), math.clamp(startPos.Y.Offset + d.Y, 0, v.Y - FAB_SIZE))
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            if dragging then
+                if moved < 6 then
+                    setOpen(not isOpen)
+                else
+                    Settings.floatX = fab.Position.X.Offset
+                    Settings.floatY = fab.Position.Y.Offset
+                    saveSettings()
+                end
+            end
+            dragging = false
+        end
+    end)
+end
+
+local resizeGrip = new("TextButton", { Name = "ResizeGrip", AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -2, 1, -2), Size = UDim2.fromOffset(20, 20), BackgroundTransparency = 1, Text = "◢", TextColor3 = C.Sub, TextSize = 12, Font = FONT_BOLD, AutoButtonColor = false, ZIndex = 6 }, window)
+do
+    local rz, rs, rw, rh = false, nil, 0, 0
+    resizeGrip.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            rz, rs = true, i.Position
+            rw, rh = window.Size.X.Offset, window.Size.Y.Offset
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(i)
+        if rz and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+            local d = i.Position - rs
+            window.Size = UDim2.fromOffset(math.clamp(rw + d.X, WIN_MIN.X, WIN_MAX.X), math.clamp(rh + d.Y, WIN_MIN.Y, WIN_MAX.Y))
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then rz = false end
+    end)
+end
+
 UserInputService.InputBegan:Connect(function(i, processed) if not processed and i.KeyCode == Enum.KeyCode.RightControl then setOpen(not isOpen) end end)
 
 local function headerIcon(glyph, name, xOff, cb)
@@ -1212,10 +1322,17 @@ local function headerIcon(glyph, name, xOff, cb)
     b.MouseButton1Click:Connect(cb)
     return b
 end
-headerIcon("×", "close", -14, function() setOpen(false) end)
-headerIcon("◷", "history", -56, function() openHistoryModal() end)
-headerIcon("↻", "new", -98, function() if busy then return end newHistory(false) end)
-headerIcon("🗑", "clear", -140, function() clearChat() end)
+headerIcon("×", "close", -14, function() setBlurOffAndDestroy() end)
+headerIcon("—", "minimize", -56, function() setOpen(false) end)
+headerIcon("◷", "history", -98, function() openHistoryModal() end)
+headerIcon("↻", "new", -140, function() if busy then return end newHistory(false) end)
+headerIcon("🗑", "clear", -182, function() clearChat() end)
+
+function setBlurOffAndDestroy()
+    blur.Size = 0
+    gui:Destroy()
+    getgenv().RealexGeminiChat = nil
+end
 
 do
     local dragging, dragStart, startPos
@@ -1234,6 +1351,7 @@ do
 end
 
 setOpen(true)
+updateModelLbl()
 
 task.spawn(function()
     if Scan.stamp == "" then for _ = 1, 60 do if Scan.stamp ~= "" then break end task.wait(0.5) end; if Scan.stamp == "" then pcall(scanGame) end end
@@ -1241,7 +1359,8 @@ task.spawn(function()
     renderReaderList("")
     for k, bb in pairs(rCatBtns) do if k == "remotes" then bb.BackgroundColor3 = C.Accent1; bb.TextColor3 = C.Dark end end
     renderChat()
-    addMessage("Realex Gemini готов. Обычный чат отвечает сразу без скана игры. Разведка — /explore <цель> или кнопка в Settings. Истории — ◷ в шапке. Очистить чат — 🗑 в шапке. Модель: " .. Settings.model .. (Settings.apiKey == "" and "\n⚠ Вставь API-ключ в Settings." or ""), false)
+    popScan({ "🛰 place preview", "remotes: " .. #Scan.remotes, "scripts: " .. #Scan.scripts, "workspace: " .. #Scan.workspaceTop })
+    addMessage("Realex Gemini готов. Обычный чат отвечает сразу без скана игры. Разведка — /explore <цель> или кнопка в Settings. Истории — ◷ в шапке. Очистить — 🗑. Свернуть — —. Модель видна в шапке справа. Модель: " .. Settings.model .. (Settings.apiKey == "" and "\n⚠ Вставь API-ключ в Settings." or ""), false)
 end)
 task.spawn(function()
     local timer = 0
